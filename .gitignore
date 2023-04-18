@@ -1,0 +1,8 @@
+*.log
+*.mp3
+*.bk
+NPCInfo.xml
+NPCInfo.lua
+exclamation.png
+NPC/
+dialogue.lua

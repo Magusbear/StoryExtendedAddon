@@ -1,0 +1,9 @@
+## Title: StoryExtended
+## Version: 0.1
+## Interface: 48632
+## SavedVariablesPerCharacter: SavedStoryExtendedDB
+embeds.xml
+db/dialogue.lua
+NPC/gornek.lua
+NPCInfo.lua
+StoryExtended.lua
