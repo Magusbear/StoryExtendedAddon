@@ -282,7 +282,6 @@ local currentSoundHandle
 function PlayDialogue(CurrentDialogue)
     local CurrentAudio = tonumber(CurrentID)
     local audioFile = "Interface\\Addons\\StoryExtended\\Audio\\Dialogue\\"..Dialogues[CurrentAudio].Name.."\\"..Dialogues[CurrentAudio].Name..Dialogues[CurrentAudio].ID..".mp3"
-    print(audioFile)
     currentSoundHandle = select(2, PlaySoundFile(audioFile))
 end
 --END
@@ -401,7 +400,7 @@ local function ConditionCheck(targetName)
         if StoryExtendedDB and StoryExtendedDB[targetName] and tonumber(StoryExtendedDB[targetName]) < key then
 
         else
-            if tostring(Dialogues[key].Name) == tostring(targetName) and Dialogues[key].Greeting == "true" and Dialogues[key].ConditionType == '' then
+            if tostring(Dialogues[key].Name) == tostring(targetName) and Dialogues[key].Greeting == "true" and Dialogues[key].ConditionType == 'none' then
                 CurrentID = tonumber(Dialogues[key].ID)
                 ConditionCheckFailed = false
                 return true
