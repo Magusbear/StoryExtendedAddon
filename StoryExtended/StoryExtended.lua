@@ -1,17 +1,14 @@
 -- Pretty much all functionality lies within this module. The other modules are used as crude database.
--- NPCInfo holds all NPCs that are interactable and points to the NPC_X.lua which exist for every interactable NPC.
+-- Dialogue.lua holds all NPCs that are interactable and points to the NPC_X.lua which exist for every interactable NPC.
 -- With the amount of text and different dialogue options that exist for each NPC it makes more sense to have a single .lua for every single one.
 
 -- Declare variables
 StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0")
 
---local db = sqlite3.open("path/to/database.db")
 StoryExtendedDB = {}          -- The save variable which is written into SavedVariables
 CurrentID = 1                 -- the current dialogue ID (the ID for which text is shown currently)
-NPCInfoCurrent = NPCInfo[CurrentID] -- The current DialogueChunk: contains all the info about name, text, questions, audio
 local NextID                        -- The ID for the upcoming Dialogue
-CurrentDialogueChapter = 1          -- defines where in the storyline the player is. Every storyline is one big conversation that can be started and restarted as often as possible until the next storyline automatically (or through player input) starts
-local HideUIOption = true
+local HideUIOption = true       -- Will add this to a proper options menu later
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
@@ -20,6 +17,7 @@ local CurrentDialogue
 
 -- Load the saved variables from disk when the addon is loaded
 LoadAddOn("StoryExtended")
+
 
 -- Ace3 functions Begin
 function StoryExtended:OnInitialize()
@@ -66,12 +64,13 @@ end
 
 -- Ace3 functions End
 
--- Add Characters/Events etc. to a list for faster retrieval
+-- Add Characters/Events etc. to a list for faster retrieval - Dunno if I should keep this
 for key, value in pairs(Dialogues) do
     local currentDialogueExtractor = Dialogues[key]
     table.insert(NamesWithDialogue, currentDialogueExtractor.Name)
 end
 
+-- Hide the UI (if the option is set)
 local function HideUI()
     TalkStoryButton:Hide()
     if HideUIOption == true then
@@ -90,6 +89,7 @@ local function HideUI()
         WatchFrame:Hide()
     end
 end
+-- function to show the UI again after having hidden it (if the option is set)
 local function ShowUI()
     TalkStoryButton:Show()
     if HideUIOption == true then
@@ -113,7 +113,6 @@ end
 
 
 -- Function that saves data into SavedVariables
---
 local function StoryExtended_OnEvent(self, event, addonName)
     if event == "ADDON_LOADED" and addonName == "StoryExtended" then
         -- Initialize the StoryExtendedDB table with defaults
@@ -372,7 +371,7 @@ function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
 end
 --END
 
--- Function to check if the players target is an NPC with Dialogue in the NPCInfo Table
+-- Function to check if the players target is an NPC with Dialogue
 local function IsNPC(targetName)
     if targetName ~= nil and StoryExtendedDB[targetName] == nil then
         for keys, value in pairs(NamesWithDialogue) do
@@ -394,6 +393,7 @@ local function IsNPC(targetName)
 end
 --END
 
+-- Checks which conditions are true and chooses the dialogue id
 local function ConditionCheck(targetName)
     local ConditionCheckFailed = false
     for key, value in pairs(Dialogues) do
@@ -439,6 +439,7 @@ local function TalkStoryFunc(zone_input)
     end
 end
 
+-- The button that triggers the start of conversations - want to add a slash command as well
 local TalkStoryButton = CreateFrame("Button", "TalkStoryButton", UIParent, "UIPanelButtonTemplate")
 TalkStoryButton:SetPoint("CENTER", UIParent, "CENTER", 450, -300)
 TalkStoryButton:SetWidth(120)
@@ -447,11 +448,13 @@ TalkStoryButton:SetText("Talk Story")
 TalkStoryButton:SetScript("OnClick", function() TalkStoryFunc(nil) end)
 -- END
 
+-- starts the start dialogue function after zone change (if there is a valid dialogue to be shown there)
 local function OnZoneChanged()
     local subzone = GetSubZoneText()
     C_Timer.After(2, function() TalkStoryFunc(subzone) end)
 end
 
+-- Register the zone change events to our OnZoneChanged script
 local zoneChangeFrame = CreateFrame("FRAME")
 zoneChangeFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
 zoneChangeFrame:RegisterEvent("ZONE_CHANGED")
