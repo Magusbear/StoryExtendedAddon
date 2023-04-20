@@ -8,7 +8,7 @@ StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.
 StoryExtendedDB = {}          -- The save variable which is written into SavedVariables
 CurrentID = 1                 -- the current dialogue ID (the ID for which text is shown currently)
 local NextID                        -- The ID for the upcoming Dialogue
-local HideUIOption = true       -- Will add this to a proper options menu later
+local HideUIOption = false       -- Will add this to a proper options menu later
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
@@ -279,8 +279,7 @@ end)
 local currentSoundHandle
 -- Function to start playing dialogue sound files
 function PlayDialogue(CurrentDialogue)
-    local CurrentAudio = tonumber(CurrentID)
-    local audioFile = "Interface\\Addons\\StoryExtended\\Audio\\Dialogue\\"..Dialogues[CurrentAudio].Name.."\\"..Dialogues[CurrentAudio].Name..Dialogues[CurrentAudio].ID..".mp3"
+    local audioFile = "Interface\\Addons\\StoryExtended\\audio\\Dialogue\\"..CurrentDialogue.Name.."\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
     currentSoundHandle = select(2, PlaySoundFile(audioFile))
 end
 --END
@@ -349,12 +348,30 @@ local function UpdateFrame(CurrentDialogue)
 end
 --END
 
+
 -- Helper Function to save the current/next dialogue into the savedVariables
 function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
     local savedName = CurrentDialogue.name
     if dialogueEnds ~= true then
         CurrentID = tonumber(NextID)
-        CurrentDialogue = Dialogues[CurrentID]
+
+
+        -- Iterate through each element in the table
+        for i, dialogue in ipairs(Dialogues) do
+            idCheck = tostring(CurrentID)
+            -- Check if the current element's id matches the id we are looking for
+            if dialogue.id == idCheck then
+                -- If it matches, save the current element to the CurrentDialogue variable
+                CurrentDialogue = dialogue
+                -- Exit the loop since we have found the element we are looking for
+                break
+            end
+        end
+
+
+        -- CurrentDialogue = Dialogues[CurrentID]
+
+
         UpdateFrame(CurrentDialogue)
         NextID = nil
     else
@@ -401,7 +418,7 @@ local function ConditionCheck(targetName)
 
         else
             if tostring(Dialogues[key].Name) == tostring(targetName) and Dialogues[key].Greeting == "true" and Dialogues[key].ConditionType == 'none' then
-                CurrentID = tonumber(Dialogues[key].ID)
+                CurrentID = tonumber(Dialogues[key].id)
                 ConditionCheckFailed = false
                 return true
             else
@@ -430,7 +447,22 @@ local function TalkStoryFunc(zone_input)
     local isCondition = ConditionCheck(targetName)
     if isCondition then
         -- If the target NPC is already in the Saved Variables then we take its last Dialogue ID
-        CurrentDialogue = Dialogues[CurrentID]
+
+        -- Iterate through each element in the table
+        for i, dialogue in ipairs(Dialogues) do
+            idCheck = tostring(CurrentID)
+            -- Check if the current element's id matches the id we are looking for
+            if dialogue.id == idCheck then
+                -- If it matches, save the current element to the CurrentDialogue variable
+                CurrentDialogue = dialogue
+                -- Exit the loop since we have found the element we are looking for
+            end
+        end
+
+
+        --CurrentDialogue = Dialogues[CurrentID]
+
+
         UpdateFrame(CurrentDialogue)
         DialogueFrame:Show()
         QuestionFrame:Show()
