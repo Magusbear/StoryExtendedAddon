@@ -436,9 +436,11 @@ end
 -- Create a button to trigger the conversation
 local function TalkStoryFunc(zone_input)
     local targetName
+    local isZone = false
     if zone_input ~= nil then
         targetName = zone_input
         zone_input = nil
+        isZone = true
     else
         targetName = UnitName("target")
     end
@@ -459,15 +461,29 @@ local function TalkStoryFunc(zone_input)
             end
         end
 
-
+        if not isZone then
+            print(targetName)
+            local isInRange = CheckInteractDistance("target", 3)
+            if isInRange then
+                -- The player is close enough to talk to the target
+                UpdateFrame(CurrentDialogue)
+                DialogueFrame:Show()
+                QuestionFrame:Show()
+                -- Hide all UI elements but the dialogue UI, if the option is activated
+                HideUI()
+            else
+                -- The player is too far away to talk to the target
+                UIErrorsFrame:AddMessage("Not in range.", 1.0, 0.1, 0.1, 1.0, 3)
+            end
+        else
+            -- The player is close enough to talk to the target
+            UpdateFrame(CurrentDialogue)
+            DialogueFrame:Show()
+            QuestionFrame:Show()
+            -- Hide all UI elements but the dialogue UI, if the option is activated
+            HideUI()
+        end
         --CurrentDialogue = Dialogues[CurrentID]
-
-
-        UpdateFrame(CurrentDialogue)
-        DialogueFrame:Show()
-        QuestionFrame:Show()
-    -- Hide all UI elements but the dialogue UI, if the option is activated
-    HideUI()
     end
 end
 
