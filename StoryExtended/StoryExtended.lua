@@ -8,11 +8,10 @@ StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.
 StoryExtendedDB = {}          -- The save variable which is written into SavedVariables
 CurrentID = 1                 -- the current dialogue ID (the ID for which text is shown currently)
 local NextID                        -- The ID for the upcoming Dialogue
-local HideUIOption = false       -- Will add this to a proper options menu later
+local HideUIOption = true       -- Will add this to a proper options menu later
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
-
 
 
 -- Load the saved variables from disk when the addon is loaded
@@ -312,6 +311,11 @@ local function UpdateFrame(CurrentDialogue)
         return
     end
     DialogueText:SetText(CurrentDialogue.Text)
+    if not StoryExtendedDB[CurrentID] then
+        StoryExtendedDB[CurrentID] = StoryExtendedDB[CurrentID] or {}
+        StoryExtendedDB[CurrentID]["Name"] = CurrentDialogue.Name
+    end    
+    
     if CurrentDialogue.UseAudio == "true" then
         PlayDialogue(CurrentDialogue)
     end
@@ -321,12 +325,24 @@ local function UpdateFrame(CurrentDialogue)
     for i = 1, 4 do
         local nameConvert = {"First", "Second", "Third", "Fourth"}
         local ButtonName = nameConvert[i].."Answer"
+        local doOnce = "DoOnce"..i
+        local didOnce = "didOnce"..i
+        if not StoryExtendedDB[CurrentID][doOnce] then
+            print(CurrentDialogue.Name)
+            print(CurrentDialogue.DoOnce1)
+            print(doOnce)
+            StoryExtendedDB[CurrentID][doOnce] = CurrentDialogue[doOnce]
+            StoryExtendedDB[CurrentID][didOnce] = "false"
+        end
         local GoToID = "GoToID"..i
-        if CurrentDialogue[ButtonName] ~= "" then
+        if CurrentDialogue[ButtonName] ~= "" and StoryExtendedDB[CurrentID][didOnce] == "false" then
             QuestionButtons[i]:Show()
             QuestionCounter = QuestionCounter + 1
             QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])
             QuestionButtons[i]:SetScript("OnClick", function()
+                if StoryExtendedDB[CurrentID][doOnce] == "true" then
+                    StoryExtendedDB[CurrentID][didOnce] = "true"
+                end
                 if tonumber(CurrentDialogue[GoToID]) == -1 then
                     dialogueEnds = true
                 end
@@ -462,7 +478,6 @@ local function TalkStoryFunc(zone_input)
         end
 
         if not isZone then
-            print(targetName)
             local isInRange = CheckInteractDistance("target", 3)
             if isInRange then
                 -- The player is close enough to talk to the target

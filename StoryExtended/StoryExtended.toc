@@ -4,6 +4,4 @@
 ## SavedVariablesPerCharacter: SavedStoryExtendedDB
 embeds.xml
 db/dialogue.lua
-NPC/gornek.lua
-NPCInfo.lua
 StoryExtended.lua
