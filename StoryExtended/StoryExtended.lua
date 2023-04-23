@@ -8,7 +8,7 @@ StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.
 StoryExtendedDB = {}          -- The save variable which is written into SavedVariables
 CurrentID = 1                 -- the current dialogue ID (the ID for which text is shown currently)
 local NextID                        -- The ID for the upcoming Dialogue
-local HideUIOption = true       -- Will add this to a proper options menu later
+local HideUIOption = false       -- Will add this to a proper options menu later
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
@@ -288,7 +288,7 @@ function StopDialogue(CurrentDialogue)
     if currentSoundHandle then
         StopSound(currentSoundHandle)
     end
-    currentSoundHandle = nil
+   -- currentSoundHandle = nil
 end
 
 -- Function to set the QuestionFrame Size depending on how many questions  the dialogue has
@@ -310,15 +310,27 @@ local function UpdateFrame(CurrentDialogue)
         ShowUI()
         return
     end
-    DialogueText:SetText(CurrentDialogue.Text)
-    if not StoryExtendedDB[CurrentID] then
-        StoryExtendedDB[CurrentID] = StoryExtendedDB[CurrentID] or {}
-        StoryExtendedDB[CurrentID]["Name"] = CurrentDialogue.Name
-    end    
-    
+    if StoryExtendedDB[CurrentID] ~= nil and StoryExtendedDB[CurrentID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
+        if StoryExtendedDB[CurrentID].didOnce1 == "false" then
+            DialogueText:SetText(CurrentDialogue.Text)        
+            if CurrentDialogue.UseAudio == "true" then
+                PlayDialogue(CurrentDialogue)
+            end
+        else
+            DialogueFrame:Hide()
+            QuestionFrame:Hide()
+            ShowUI()
+            return
+        end
+    end
+    DialogueText:SetText(CurrentDialogue.Text)        
     if CurrentDialogue.UseAudio == "true" then
         PlayDialogue(CurrentDialogue)
     end
+    if not StoryExtendedDB[CurrentID] then
+        StoryExtendedDB[CurrentID] = StoryExtendedDB[CurrentID] or {}
+        StoryExtendedDB[CurrentID]["Name"] = CurrentDialogue.Name
+    end  
     -- Set the button labels and enable/disable them based on the button information
     local QuestionCounter = 0
     local dialogueEnds = false
@@ -327,10 +339,8 @@ local function UpdateFrame(CurrentDialogue)
         local ButtonName = nameConvert[i].."Answer"
         local doOnce = "DoOnce"..i
         local didOnce = "didOnce"..i
+        local AlreadySeen = "AlreadySeen"..i
         if not StoryExtendedDB[CurrentID][doOnce] then
-            print(CurrentDialogue.Name)
-            print(CurrentDialogue.DoOnce1)
-            print(doOnce)
             StoryExtendedDB[CurrentID][doOnce] = CurrentDialogue[doOnce]
             StoryExtendedDB[CurrentID][didOnce] = "false"
         end
@@ -339,7 +349,13 @@ local function UpdateFrame(CurrentDialogue)
             QuestionButtons[i]:Show()
             QuestionCounter = QuestionCounter + 1
             QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])
-            QuestionButtons[i]:SetScript("OnClick", function()
+            if (StoryExtendedDB[CurrentID] ~= nil and StoryExtendedDB[CurrentID][AlreadySeen] ~= nil and StoryExtendedDB[CurrentID][AlreadySeen] == true) then
+                QuestionButtons[i]:GetFontString():SetTextColor(0.66, 0.66, 0.66)
+            else
+                QuestionButtons[i]:GetFontString():SetTextColor(1, 1, 1)
+            end
+            QuestionButtons[i]:SetScript("OnClick", function()  
+                StoryExtendedDB[CurrentID][AlreadySeen] = true
                 if StoryExtendedDB[CurrentID][doOnce] == "true" then
                     StoryExtendedDB[CurrentID][didOnce] = "true"
                 end
@@ -370,8 +386,6 @@ function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
     local savedName = CurrentDialogue.name
     if dialogueEnds ~= true then
         CurrentID = tonumber(NextID)
-
-
         -- Iterate through each element in the table
         for i, dialogue in ipairs(Dialogues) do
             idCheck = tostring(CurrentID)
@@ -431,7 +445,6 @@ local function ConditionCheck(targetName)
     local ConditionCheckFailed = false
     for key, value in pairs(Dialogues) do
         if StoryExtendedDB and StoryExtendedDB[targetName] and tonumber(StoryExtendedDB[targetName]) < key then
-
         else
             if tostring(Dialogues[key].Name) == tostring(targetName) and Dialogues[key].Greeting == "true" and Dialogues[key].ConditionType == 'none' then
                 CurrentID = tonumber(Dialogues[key].id)
@@ -480,23 +493,25 @@ local function TalkStoryFunc(zone_input)
         if not isZone then
             local isInRange = CheckInteractDistance("target", 3)
             if isInRange then
-                -- The player is close enough to talk to the target
-                UpdateFrame(CurrentDialogue)
                 DialogueFrame:Show()
                 QuestionFrame:Show()
                 -- Hide all UI elements but the dialogue UI, if the option is activated
                 HideUI()
+                -- The player is close enough to talk to the target
+                UpdateFrame(CurrentDialogue)
+
             else
                 -- The player is too far away to talk to the target
                 UIErrorsFrame:AddMessage("Not in range.", 1.0, 0.1, 0.1, 1.0, 3)
             end
         else
             -- The player is close enough to talk to the target
-            UpdateFrame(CurrentDialogue)
+            -- Hide all UI elements but the dialogue UI, if the option is activated 
+            HideUI()
             DialogueFrame:Show()
             QuestionFrame:Show()
-            -- Hide all UI elements but the dialogue UI, if the option is activated
-            HideUI()
+            UpdateFrame(CurrentDialogue)
+
         end
         --CurrentDialogue = Dialogues[CurrentID]
     end
