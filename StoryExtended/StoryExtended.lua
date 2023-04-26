@@ -12,6 +12,45 @@ local HideUIOption = false       -- Will add this to a proper options menu later
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
+local currentDataAddon = nil
+
+
+
+local CURRENT_DATA_ADDON_VERSION = 1;
+
+dialogueDataAddons =
+{
+    availableDataAddons = {},         -- To store the list of modules present in Interface\AddOns folder, whether they're loaded or not
+    availableDataAddonsOrdered = {},  -- To store the list of modules present in Interface\AddOns folder, whether they're loaded or not
+    registeredDataAddons = {},        -- To keep track of which module names were already registered
+    registeredDataAddonsOrdered = {}, -- To have a consistent ordering of modules (which key-value hashmaps don't provide) to avoid bugs that can only be reproduced randomly
+}
+
+
+-- Register the data addons
+
+function StoryExtended:Register(name, dataAddon)
+    assert(not dialogueDataAddons.registeredDataAddons[name], format([[Data addon "%s" already registered]], name))
+
+    local metadata = assert(dialogueDataAddons.availableDataAddons[name],
+        format([[A data addon "%s" attempted to register but could not be properly loaded. Check if .toc file was generated correctly.]], name))
+    -- local dataVersion = assert(tonumber(GetAddOnMetadata(name, "StoryExtended-Data-Version")),
+    --     format([[Data Addon "%s" is missing data version]], name))
+
+    -- Ideally if module format would ever change - there should be fallbacks in place to handle outdated formats
+ --   assert(dataVersion == CURRENT_DATA_ADDON_VERSION,
+ --       format([[The data addon "%s" is outdated. To use it with the current version of the core addon please import it into the web app, refresh it and download it again (Data Addon version %d, current version %d)]], name, dataVersion,
+  --      CURRENT_DATA_ADDON_VERSION))
+
+    --    dataAddon.METADATA = metadata
+
+    dialogueDataAddons.registeredDataAddons[name] = dataAddon
+    -- table.insert(registeredDataAddonsOrdered, dataAddon)
+    --currentDataAddon = dialogueDataAddons.registeredDataAddons[1]
+    dataAddonVersion = GetAddOnMetadata(name, "Version")
+    --LoadAddOn(name)
+end
+
 
 
 -- Load the saved variables from disk when the addon is loaded
@@ -21,6 +60,7 @@ LoadAddOn("StoryExtended")
 -- Ace3 functions Begin
 function StoryExtended:OnInitialize()
     -- Code that you want to run when the addon is first loaded goes here.
+    
     StoryExtended:Print("Hello, world!")
     StoryExtended:SetMyMessage(info, input)
     StoryExtended:GetMyMessage(info)
@@ -63,11 +103,37 @@ end
 
 -- Ace3 functions End
 
--- Add Characters/Events etc. to a list for faster retrieval - Dunno if I should keep this
-for key, value in pairs(Dialogues) do
-    local currentDialogueExtractor = Dialogues[key]
-    table.insert(NamesWithDialogue, currentDialogueExtractor.Name)
+
+function checkLoadDataAddons()
+    local playerName = UnitName("player")
+    for i = 1, GetNumAddOns() do
+        local name = GetAddOnInfo(i)
+        if GetAddOnMetadata(i, "X-StoryExtendedData-Parent") == "StoryExtended" then
+            local dataAddon = {
+                dataAddonName = name,
+                dataAddonVersion = GetAddOnMetadata(name, "Version"),
+                databaseVersion = GetAddOnMetadata(name, "X-StoryExtended-Data-Version"),
+                webAppVersion = GetAddOnMetadata(name, "X-StoryExtended-WebApp-Version"),
+                dataAddonTitle = GetAddOnMetadata(name, "Title") or name,
+                dataAddonPriority = GetAddOnMetadata(name, "X-StoryExtended-Priority"),
+            }
+            dialogueDataAddons.availableDataAddons[name] = dataAddon
+            table.insert(dialogueDataAddons.availableDataAddonsOrdered, dataAddon)
+            EnableAddOn(dataAddon.dataAddonName)
+            LoadAddOn(dataAddon.dataAddonName)
+            -- local dial = GetDialogueData()
+            -- print(dial[1].Name)
+        end
+    end
 end
+
+checkLoadDataAddons()
+
+-- Add Characters/Events etc. to a list for faster retrieval - Dunno if I should keep this
+-- for key, value in pairs(Dialogues) do
+--     local currentDialogueExtractor = Dialogues[key]
+--     table.insert(NamesWithDialogue, currentDialogueExtractor.Name)
+-- end
 
 -- Hide the UI (if the option is set)
 local function HideUI()
@@ -291,6 +357,16 @@ function StopDialogue(CurrentDialogue)
    -- currentSoundHandle = nil
 end
 
+-- local function IsQuestCompleted(questId)
+--     local completedQuests = C_QuestLog.GetCompletedQuests()
+--     for i, completedQuestId in ipairs(completedQuests) do
+--         if completedQuestId == questId then
+--             return true
+--         end
+--     end
+--     return false
+-- end
+
 -- Function to set the QuestionFrame Size depending on how many questions  the dialogue has
 local function QuestionButtonHider(QuestionCounter)
     local QuestionFrameHeights = {50, 100, 150, 200}
@@ -298,8 +374,29 @@ local function QuestionButtonHider(QuestionCounter)
     QuestionFrame:SetHeight(QuestionFrameHeight)
 end
 
+local function StartConditionCheck(targetName, conditionType, conditionValue)
+    local playerName = UnitName("player")
+    local playerLevel = UnitLevel("player")
+    if (conditionType == "level" and tonumber(playerLevel) >= tonumber(conditionValue)) then
+        return true
+    elseif (conditionType == "quest-id" and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then
+        print("Quest true")
+        return true
+    elseif (conditionType == "none") then
+        return true
+    else
+        return false
+    end
+
+    --local lastSeenDate = StoryExtendedDB.LastSeenDays         local currentDate = date("%m/%d/%y")    <-- Something to think about. For a different dialogue a 
+                                                                                                        --couple real days later for more immersion and feel of a living world
+
+end
+
+
+
 -- Function to update the text and buttons based on the NPC information
-local function UpdateFrame(CurrentDialogue)
+local function UpdateFrame(CurrentDialogue, targetName)
     -- Do we have a valid NPC loaded? If not, then stop the function and hide the dialogue interface
     if CurrentDialogue == nil then
         DialogueFrame:Hide()
@@ -310,8 +407,8 @@ local function UpdateFrame(CurrentDialogue)
         ShowUI()
         return
     end
-    if StoryExtendedDB[CurrentID] ~= nil and StoryExtendedDB[CurrentID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
-        if StoryExtendedDB[CurrentID].didOnce1 == "false" then
+    if StoryExtendedDB[CurrentDialogue.Name][CurrentID] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
+        if StoryExtendedDB[CurrentDialogue.Name][CurrentID].didOnce1 == "false" then
             DialogueText:SetText(CurrentDialogue.Text)        
             if CurrentDialogue.UseAudio == "true" then
                 PlayDialogue(CurrentDialogue)
@@ -327,9 +424,9 @@ local function UpdateFrame(CurrentDialogue)
     if CurrentDialogue.UseAudio == "true" then
         PlayDialogue(CurrentDialogue)
     end
-    if not StoryExtendedDB[CurrentID] then
-        StoryExtendedDB[CurrentID] = StoryExtendedDB[CurrentID] or {}
-        StoryExtendedDB[CurrentID]["Name"] = CurrentDialogue.Name
+    if not StoryExtendedDB[CurrentDialogue.Name][CurrentID] then
+        StoryExtendedDB[CurrentDialogue.Name][CurrentID] = StoryExtendedDB[CurrentDialogue.Name][CurrentID] or {}
+        StoryExtendedDB[CurrentDialogue.Name][CurrentID]["Name"] = CurrentDialogue.Name
     end  
     -- Set the button labels and enable/disable them based on the button information
     local QuestionCounter = 0
@@ -340,24 +437,44 @@ local function UpdateFrame(CurrentDialogue)
         local doOnce = "DoOnce"..i
         local didOnce = "didOnce"..i
         local AlreadySeen = "AlreadySeen"..i
-        if not StoryExtendedDB[CurrentID][doOnce] then
-            StoryExtendedDB[CurrentID][doOnce] = CurrentDialogue[doOnce]
-            StoryExtendedDB[CurrentID][didOnce] = "false"
+        if not StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] then
+            StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] = CurrentDialogue[doOnce]
+            StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] = "false"
         end
         local GoToID = "GoToID"..i
-        if CurrentDialogue[ButtonName] ~= "" and StoryExtendedDB[CurrentID][didOnce] == "false" then
+        local btnConditionType
+        local btnConditionValue
+        local conditionCheck = false
+        for key, value in pairs(Dialogues) do
+            if (tonumber(Dialogues[key].id) == tonumber(CurrentDialogue[GoToID])) then
+                btnConditionType = Dialogues[key].ConditionType
+                print(btnConditionType)
+                btnConditionValue = Dialogues[key].ConditionValue
+                print(btnConditionValue)
+
+                if (btnConditionType ~= "none") then
+                    conditionCheck = StartConditionCheck(targetName, btnConditionType, btnConditionValue)
+                else
+                    conditionCheck = true
+                end
+            elseif (tonumber(CurrentDialogue[GoToID]) == -1) then
+                conditionCheck = true
+            end
+        end
+
+        if CurrentDialogue[ButtonName] ~= "" and StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] == "false" and conditionCheck == true then
             QuestionButtons[i]:Show()
             QuestionCounter = QuestionCounter + 1
             QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])
-            if (StoryExtendedDB[CurrentID] ~= nil and StoryExtendedDB[CurrentID][AlreadySeen] ~= nil and StoryExtendedDB[CurrentID][AlreadySeen] == true) then
+            if (StoryExtendedDB[CurrentDialogue.Name][CurrentID] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] == true) then
                 QuestionButtons[i]:GetFontString():SetTextColor(0.66, 0.66, 0.66)
             else
                 QuestionButtons[i]:GetFontString():SetTextColor(1, 1, 1)
             end
             QuestionButtons[i]:SetScript("OnClick", function()  
-                StoryExtendedDB[CurrentID][AlreadySeen] = true
-                if StoryExtendedDB[CurrentID][doOnce] == "true" then
-                    StoryExtendedDB[CurrentID][didOnce] = "true"
+                StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] = true
+                if StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] == "true" then
+                    StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] = "true"
                 end
                 if tonumber(CurrentDialogue[GoToID]) == -1 then
                     dialogueEnds = true
@@ -411,7 +528,7 @@ function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
         end
         QuestionFrame:Hide()
         ShowUI()
-        CurrentID = StoryExtendedDB[targetName]
+        CurrentID = StoryExtendedDB[CurrentDialogue.Name][targetName]
         dialogueEnds = false
         NextID = nil
     end
@@ -420,7 +537,7 @@ end
 
 -- Function to check if the players target is an NPC with Dialogue
 local function IsNPC(targetName)
-    if targetName ~= nil and StoryExtendedDB[targetName] == nil then
+    if targetName ~= nil and StoryExtendedDB[CurrentDialogue.Name][targetName] == nil then
         for keys, value in pairs(NamesWithDialogue) do
             if NamesWithDialogue[keys] == targetName then
                 return true
@@ -431,35 +548,51 @@ local function IsNPC(targetName)
     --         CurrentID = Dialogues[key]
     --     end
     -- end
-    StoryExtendedDB[targetName] = CurrentID
-    elseif targetName ~= nil and StoryExtendedDB[targetName] ~= nil then
-        CurrentID = StoryExtendedDB[targetName]
+    StoryExtendedDB[CurrentDialogue.Name][targetName] = CurrentID
+    elseif targetName ~= nil and StoryExtendedDB[CurrentDialogue.Name][targetName] ~= nil then
+        CurrentID = StoryExtendedDB[CurrentDialogue.Name][targetName]
         return true
     end
     return false, nil
 end
 --END
 
--- Checks which conditions are true and chooses the dialogue id
-local function ConditionCheck(targetName)
-    local ConditionCheckFailed = false
-    for key, value in pairs(Dialogues) do
-        if StoryExtendedDB and StoryExtendedDB[targetName] and tonumber(StoryExtendedDB[targetName]) < key then
-        else
-            if tostring(Dialogues[key].Name) == tostring(targetName) and Dialogues[key].Greeting == "true" and Dialogues[key].ConditionType == 'none' then
-                CurrentID = tonumber(Dialogues[key].id)
-                ConditionCheckFailed = false
-                return true
-            else
-                ConditionCheckFailed = true
-                CurrentID = tonumber(StoryExtendedDB[targetName])
+
+
+local function chooseDatabase(targetName)
+    --check which data addon to use
+    for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do
+        local addonName = name
+        local dialogueData = dataAddon.GetDialogue
+        local checkDialogues = dialogueData
+        local foundNpcDialogues = {}
+        local internalConditionSuccess = false
+        local conditionSuccess = false
+        for key, value in pairs(checkDialogues) do
+            if (targetName == checkDialogues[key].Name and checkDialogues[key].Greeting == "true") then
+                internalConditionSuccess = StartConditionCheck(targetName, checkDialogues[key].ConditionType, checkDialogues[key].ConditionValue)
+                print("Name: ", checkDialogues[key].Name, " Condition: ", internalConditionSuccess)
+                -- If we have a condition success we have to check if any dialogues further down the line are also eligable
+                -- if (conditionSuccess == false) then
+                --     return nil
+                -- end
+                if (internalConditionSuccess == true) then
+                    print(addonName, "ID: ", checkDialogues[key].id)
+                    foundNpcDialogues[#foundNpcDialogues+1] = checkDialogues[key]
+                    CurrentID = tonumber(checkDialogues[key].id)
+                    conditionSuccess = true
+                    print(checkDialogues[key].Name, "Found in DataAddon:", addonName)
+                    print(#foundNpcDialogues)
+                end
             end
         end
+        if (foundNpcDialogues ~= nil and #foundNpcDialogues > 0) then
+            print("Found something")
+            print("CurrentID: ", CurrentID)
+            return dialogueData, conditionSuccess
+        end
     end
-    if ConditionCheckFailed == true then
-        ConditionCheckFailed = false
-        return false, nil
-    end
+    return nil, false
 end
 
 -- Create a button to trigger the conversation
@@ -474,8 +607,8 @@ local function TalkStoryFunc(zone_input)
         targetName = UnitName("target")
     end
     --local isNPC = IsNPC(targetName)
-
-    local isCondition = ConditionCheck(targetName)
+    local isCondition
+    Dialogues, isCondition = chooseDatabase(targetName)
     if isCondition then
         -- If the target NPC is already in the Saved Variables then we take its last Dialogue ID
 
@@ -510,7 +643,7 @@ local function TalkStoryFunc(zone_input)
             HideUI()
             DialogueFrame:Show()
             QuestionFrame:Show()
-            UpdateFrame(CurrentDialogue)
+            UpdateFrame(CurrentDialogue, targetName)
 
         end
         --CurrentDialogue = Dialogues[CurrentID]
