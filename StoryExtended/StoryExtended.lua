@@ -9,6 +9,9 @@ StoryExtendedDB = {}          -- The save variable which is written into SavedVa
 CurrentID = 1                 -- the current dialogue ID (the ID for which text is shown currently)
 local NextID                        -- The ID for the upcoming Dialogue
 local HideUIOption = false       -- Will add this to a proper options menu later
+local lockDialogueFrames = true
+local lockedFramesHelper = false
+local letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
 local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
@@ -58,46 +61,75 @@ LoadAddOn("StoryExtended")
 
 
 -- Ace3 functions Begin
-function StoryExtended:OnInitialize()
-    -- Code that you want to run when the addon is first loaded goes here.
-    StoryExtended:RegisterChatCommand("se", "SlashCommand")
-	StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")
-    StoryExtended:SetMyMessage(info, input)
-    StoryExtended:GetMyMessage(info)
-  end
 
-function StoryExtended:OnEnable()
-    -- Called when the addon is enabled
-end
+local defaults = {
+	profile = {
+		HideUIOption = false,
+        lockDialogueFrames = true
+	},
+}
 
-function StoryExtended:OnDisable()
-    -- Called when the addon is disabled
-end  
 
 local options = {
     name = "StoryExtended",
     handler = StoryExtended,
     type = 'group',
     args = {
-        msg = {
-            type = 'input',
-            name = 'My Message',
-            desc = 'The message for my addon',
-            set = 'SetMyMessage',
-            get = 'GetMyMessage',
+        HideUIOption = {
+            type = 'toggle',
+            name = 'Hide UI',
+            desc = 'Hide the Interface when starting a Dialogue.',
+            set = function (info, value)
+                StoryExtended.db.profile.HideUIOption = value
+                HideUIOption = StoryExtended.db.profile.HideUIOption
+            end,
+            get = function (info) return StoryExtended.db.profile.HideUIOption end,
         },
-    },
+        LockDialogueFrames = {
+            type = 'toggle',
+            name = 'Lock Frames',
+            desc = 'Lock the dialogue frames.',
+            set = function (info, value)
+                StoryExtended.db.profile.lockDialogueFrames = value
+                lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+                letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+                DialogueFrame:SetMovable(letMoveFrames)
+                QuestionFrame:SetMovable(letMoveFrames)
+                DialogueFrame:EnableMouse(letMoveFrames)
+                QuestionFrame:EnableMouse(letMoveFrames)
+            end,
+            get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
+        },
+    }
 }
 
-LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended", options, "testslash")
+function StoryExtended:OnInitialize()
 
-function StoryExtended:GetMyMessage(info)
-    return myMessageVar
 end
 
-function StoryExtended:SetMyMessage(info, input)
-    myMessageVar = input
+function StoryExtended:OnEnable()
+    StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)
+    LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_options", options)
+    StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_options", "StoryExtended")
+  --  LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_general", general)
+--	StoryExtended.generalframe = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_general", "General", "StoryExtended")
+
+    local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)
+    LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_Profiles", profile)
+    LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_Profiles", "Profiles", "StoryExtended")
+
+    StoryExtended:RegisterChatCommand("se", "SlashCommand")
+	StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")
+    HideUIOption = StoryExtended.db.profile.HideUIOption
+    lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+    letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+    --HideUIOption = StoryExtended.db.profile.HideUIOption
+    -- Called when the addon is enabled
 end
+
+function StoryExtended:OnDisable()
+    -- Called when the addon is disabled
+end  
 
 -- Ace3 functions End
 
@@ -159,6 +191,7 @@ local function HideUI()
         ChatFrameMenuButton:Hide()
         ChatFrameChannelButton:Hide()
         WatchFrame:Hide()
+        StanceBarFrame:Hide()
     end
 end
 -- function to show the UI again after having hidden it (if the option is set)
@@ -180,9 +213,14 @@ local function ShowUI()
         ChatFrameMenuButton:Show()
         ChatFrameChannelButton:Show()
         WatchFrame:Show()
+        StanceBarFrame:Show()
     end
 end
 
+function StoryExtended:OnShutdown()
+    -- save the current profile before the addon is unloaded
+    StoryExtended.db:ProfileChanged(StoryExtended.db:GetCurrentProfile())
+end
 
 -- Function that saves data into SavedVariables
 local function StoryExtended_OnEvent(self, event, addonName)
@@ -196,6 +234,11 @@ local function StoryExtended_OnEvent(self, event, addonName)
             StoryExtendedDB = SavedStoryExtendedDB
         end
     elseif event == "PLAYER_LOGOUT" then
+        print(StoryExtended.db)
+        -- StoryExtended.db:Save()
+        -- if StoryExtended.db then
+        --    GlobalStoryExtendedDB = StoryExtended.db
+        -- end
         -- Save the StoryExtendedDB table to the SavedVariables file
         if StoryExtendedDB then
             SavedStoryExtendedDB = StoryExtendedDB
@@ -228,8 +271,8 @@ DialogueFrame:SetBackdrop({
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
 })
 DialogueFrame:SetBackdropColor(0, 0, 0, 1)
-DialogueFrame:SetMovable(true)
-DialogueFrame:EnableMouse(true)
+DialogueFrame:SetMovable(letMoveFrames)
+DialogueFrame:EnableMouse(letMoveFrames)
 DialogueFrame:RegisterForDrag("LeftButton")
 DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
 DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
@@ -254,8 +297,8 @@ QuestionFrame:SetBackdrop({
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
 })
 QuestionFrame:SetBackdropColor(0, 0, 0, 1)
-QuestionFrame:SetMovable(true)
-QuestionFrame:EnableMouse(true)
+QuestionFrame:SetMovable(letMoveFrames)
+QuestionFrame:EnableMouse(letMoveFrames)
 QuestionFrame:RegisterForDrag("LeftButton")
 QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
 QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
@@ -732,7 +775,7 @@ function StoryExtended:SlashCommand(msg)
 end
 
 -- Hide the frame when the player clicks outside of it
-DialogueFrame:SetScript("OnMouseDown", function() DialogueFrame:StopMovingOrSizing() end)
+--DialogueFrame:SetScript("OnMouseDown", function() DialogueFrame:StopMovingOrSizing() end)
 DialogueFrame:Hide()
 QuestionFrame:Hide()
 for index, QuestionButton in ipairs(QuestionButtons) do
