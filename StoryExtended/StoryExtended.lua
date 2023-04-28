@@ -60,8 +60,8 @@ LoadAddOn("StoryExtended")
 -- Ace3 functions Begin
 function StoryExtended:OnInitialize()
     -- Code that you want to run when the addon is first loaded goes here.
-    
-    StoryExtended:Print("Hello, world!")
+    StoryExtended:RegisterChatCommand("se", "SlashCommand")
+	StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")
     StoryExtended:SetMyMessage(info, input)
     StoryExtended:GetMyMessage(info)
   end
@@ -728,6 +728,12 @@ zoneChangeFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
 zoneChangeFrame:RegisterEvent("ZONE_CHANGED")
 zoneChangeFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 zoneChangeFrame:SetScript("OnEvent", OnZoneChanged)
+
+function StoryExtended:SlashCommand(msg)
+    if(msg == "talk") then
+        TalkStoryFunc()
+    end
+end
 
 -- Hide the frame when the player clicks outside of it
 DialogueFrame:SetScript("OnMouseDown", function() DialogueFrame:StopMovingOrSizing() end)
