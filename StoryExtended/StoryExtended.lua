@@ -74,8 +74,6 @@ function StoryExtended:OnDisable()
     -- Called when the addon is disabled
 end  
 
---StoryExtended:RegisterChatCommand("talkstory", "TalkStoryFunc")
-
 local options = {
     name = "StoryExtended",
     handler = StoryExtended,
@@ -134,6 +132,15 @@ checkLoadDataAddons()
 --     local currentDialogueExtractor = Dialogues[key]
 --     table.insert(NamesWithDialogue, currentDialogueExtractor.Name)
 -- end
+
+-- For saving the Character names as numeric values because SavedVariables doesnt like non-numeric values as index
+local function hashString(str)
+    local sum = 0
+    for i = 1, #str do
+      sum = sum + string.byte(str, i)
+    end
+    return sum
+  end
 
 -- Hide the UI (if the option is set)
 local function HideUI()
@@ -377,11 +384,19 @@ end
 local function StartConditionCheck(targetName, conditionType, conditionValue)
     local playerName = UnitName("player")
     local playerLevel = UnitLevel("player")
+    local npcID = hashString(targetName)
     if (conditionType == "level" and tonumber(playerLevel) >= tonumber(conditionValue)) then
         return true
     elseif (conditionType == "quest-id" and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then
-        print("Quest true")
         return true
+    elseif (conditionType == "doFirst") then
+        local npcCheck, npcIdCheck = conditionValue:match("([^,]+),([^,]+)")
+        local hashedNpcCheck = hashString(npcCheck)       
+        if(StoryExtendedDB[hashedNpcCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] == true) then
+            return true
+        else
+            return false
+        end
     elseif (conditionType == "none") then
         return true
     else
@@ -397,6 +412,7 @@ end
 
 -- Function to update the text and buttons based on the NPC information
 local function UpdateFrame(CurrentDialogue, targetName)
+    local npcIndexID = CurrentDialogue.id
     -- Do we have a valid NPC loaded? If not, then stop the function and hide the dialogue interface
     if CurrentDialogue == nil then
         DialogueFrame:Hide()
@@ -407,8 +423,18 @@ local function UpdateFrame(CurrentDialogue, targetName)
         ShowUI()
         return
     end
-    if StoryExtendedDB[CurrentDialogue.Name][CurrentID] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
-        if StoryExtendedDB[CurrentDialogue.Name][CurrentID].didOnce1 == "false" then
+    local npcID = hashString(CurrentDialogue.Name)    
+    -- if the npcID subtable does not exist yet, create it
+    if not StoryExtendedDB[npcID] then
+        StoryExtendedDB[npcID] = {}
+    end
+    if not StoryExtendedDB[npcID][npcIndexID] then
+        StoryExtendedDB[npcID][npcIndexID] = {}
+        StoryExtendedDB[npcID][npcIndexID]["Name"] = CurrentDialogue.Name or {}
+    end  
+
+    if StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][npcIndexID] ~= nil and StoryExtendedDB[npcID][npcIndexID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
+        if StoryExtendedDB[npcID][npcIndexID].didOnce1 == "false" then
             DialogueText:SetText(CurrentDialogue.Text)        
             if CurrentDialogue.UseAudio == "true" then
                 PlayDialogue(CurrentDialogue)
@@ -424,72 +450,100 @@ local function UpdateFrame(CurrentDialogue, targetName)
     if CurrentDialogue.UseAudio == "true" then
         PlayDialogue(CurrentDialogue)
     end
-    if not StoryExtendedDB[CurrentDialogue.Name][CurrentID] then
-        StoryExtendedDB[CurrentDialogue.Name][CurrentID] = StoryExtendedDB[CurrentDialogue.Name][CurrentID] or {}
-        StoryExtendedDB[CurrentDialogue.Name][CurrentID]["Name"] = CurrentDialogue.Name
-    end  
     -- Set the button labels and enable/disable them based on the button information
     local QuestionCounter = 0
     local dialogueEnds = false
+    -- Setup loop for the 4 dialogue choice buttons
     for i = 1, 4 do
-        local nameConvert = {"First", "Second", "Third", "Fourth"}
+        -- Setting up variables
+        local nameConvert = {"First", "Second", "Third", "Fourth"}          -- Stupid workaround because I am bad at naming variables
         local ButtonName = nameConvert[i].."Answer"
         local doOnce = "DoOnce"..i
         local didOnce = "didOnce"..i
+        local AlreadySeenAll = "AlreadySeenAll"
         local AlreadySeen = "AlreadySeen"..i
-        if not StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] then
-            StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] = CurrentDialogue[doOnce]
-            StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] = "false"
-        end
         local GoToID = "GoToID"..i
         local btnConditionType
         local btnConditionValue
         local conditionCheck = false
+        -- Variables End
+        -- If doOnce does not exist yet in the dialogue ID under the current NPC we have to create it and set its sibling value didOnce to false
+        if StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][npcIndexID] ~= nil and StoryExtendedDB[npcID][npcIndexID][doOnce] == nil then
+            StoryExtendedDB[npcID][npcIndexID][doOnce] = CurrentDialogue[doOnce]
+            StoryExtendedDB[npcID][npcIndexID][didOnce] = "false"
+        end
+        -- Loop through our current dialogue database
         for key, value in pairs(Dialogues) do
+            -- Look for the Dialogue ID that fits our GoToID (so the ID of the dialogue this player choice leads to) and take its conditionType and conditionValue
             if (tonumber(Dialogues[key].id) == tonumber(CurrentDialogue[GoToID])) then
                 btnConditionType = Dialogues[key].ConditionType
-                print(btnConditionType)
                 btnConditionValue = Dialogues[key].ConditionValue
-                print(btnConditionValue)
-
+                -- if it has a condition we check for it and set conditionCheck to either true or false
                 if (btnConditionType ~= "none") then
-                    conditionCheck = StartConditionCheck(targetName, btnConditionType, btnConditionValue)
+                    conditionCheck = StartConditionCheck(CurrentDialogue.Name, btnConditionType, btnConditionValue)
                 else
                     conditionCheck = true
                 end
+            -- if this dialogue choice would end the conversation (-1) skip the conditionCheck
             elseif (tonumber(CurrentDialogue[GoToID]) == -1) then
                 conditionCheck = true
             end
         end
+        -- Check if the player choice is not empty and that the condition Check (based on the dialogue conditions) was passed
+        if CurrentDialogue[ButtonName] ~= "" and conditionCheck == true then
+            -- If the StoryExtendedDB for this character exists and didOnce is set to false: continue (didOnce is set to true if this is a one time player choice and has already been clicked before)
+        --    if StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][CurrentID] ~= nil and StoryExtendedDB[npcID][CurrentID][didOnce] ~= nil and StoryExtendedDB[npcID][CurrentID][didOnce] == "false" then
+            if StoryExtendedDB[npcID][npcIndexID][didOnce] == "false" then
+                -- Reveal the question button (player choice)
+                QuestionButtons[i]:Show()
+                -- To keep track of how many valid player choices we have activated
+                QuestionCounter = QuestionCounter + 1
+                -- Set the text of the question buttons to the text of the player choice 1-4
+                QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])
+                -- Check if the player choice has already been seen before / clicked before. If so its colored grey
+                if (StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][npcIndexID] ~= nil and StoryExtendedDB[npcID][npcIndexID][AlreadySeen] ~= nil and StoryExtendedDB[npcID][npcIndexID][AlreadySeen] == true) then
+                    QuestionButtons[i]:GetFontString():SetTextColor(0.66, 0.66, 0.66)
+                else
+                    QuestionButtons[i]:GetFontString():SetTextColor(1, 1, 1)
+                end
 
-        if CurrentDialogue[ButtonName] ~= "" and StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] == "false" and conditionCheck == true then
-            QuestionButtons[i]:Show()
-            QuestionCounter = QuestionCounter + 1
-            QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])
-            if (StoryExtendedDB[CurrentDialogue.Name][CurrentID] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] ~= nil and StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] == true) then
-                QuestionButtons[i]:GetFontString():SetTextColor(0.66, 0.66, 0.66)
+                -- Activate the On Button Click functionality and set it up
+                QuestionButtons[i]:SetScript("OnClick", function()
+                    -- Set the SavedVariables dialogue ID to AlreadySeen (so we can check if it has been seen and should be seen again)
+                    StoryExtendedDB[npcID][npcIndexID][AlreadySeen] = StoryExtendedDB[npcID][npcIndexID][AlreadySeen] or true
+                    StoryExtendedDB[npcID][npcIndexID][AlreadySeenAll] = StoryExtendedDB[npcID][npcIndexID][AlreadySeenAll] or true
+                    -- Check if DoOnce is set for this dialogue choice. If so then set the didOnce to true
+                    if StoryExtendedDB[npcID][npcIndexID][doOnce] == "true" then
+                        StoryExtendedDB[npcID][npcIndexID][didOnce] = "true"
+                    end
+                    -- convert the string value of GoToID1-4 to int and if it is -1 then set dialogueEnds to true (-1 -> dialogue ends) 
+                    if tonumber(CurrentDialogue[GoToID]) == -1 then
+                        dialogueEnds = true
+                    end
+                    -- Stop the dialogue mp3 playback if there is any
+                    StopDialogue(CurrentDialogue)
+                    -- The GoToID1-4 becomes our NextID to grab our dialogue from
+                    NextID = CurrentDialogue[GoToID]
+                    -- Update Dialogue function handles grabbing the next dialogue file
+                    UpdateDialogue(CurrentDialogue, NextID, dialogueEnds)
+                end)
+                -- Enable clicking the Question Buttons
+                QuestionButtons[i]:Enable()
             else
-                QuestionButtons[i]:GetFontString():SetTextColor(1, 1, 1)
+                -- Whole block is for deactivating the question buttons for empty dialogue choices
+                QuestionButtons[i]:SetText("")
+                QuestionButtons[i]:SetScript("OnClick", nil)
+                QuestionButtons[i]:Disable()
+                QuestionButtons[i]:Hide()
             end
-            QuestionButtons[i]:SetScript("OnClick", function()  
-                StoryExtendedDB[CurrentDialogue.Name][CurrentID][AlreadySeen] = true
-                if StoryExtendedDB[CurrentDialogue.Name][CurrentID][doOnce] == "true" then
-                    StoryExtendedDB[CurrentDialogue.Name][CurrentID][didOnce] = "true"
-                end
-                if tonumber(CurrentDialogue[GoToID]) == -1 then
-                    dialogueEnds = true
-                end
-                StopDialogue(CurrentDialogue)
-                NextID = CurrentDialogue[GoToID]
-                UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
-            end)
-            QuestionButtons[i]:Enable()
         else
+            -- Whole block is for deactivating the question buttons for empty dialogue choices
             QuestionButtons[i]:SetText("")
             QuestionButtons[i]:SetScript("OnClick", nil)
             QuestionButtons[i]:Disable()
             QuestionButtons[i]:Hide()
         end
+        -- Our for loop goes up to 4, so on the last loop we run the QuestionButtoNHider function (which hides frame elements for empty dialogue choices)
         if i == 4 then
             QuestionButtonHider(QuestionCounter)
         end
@@ -499,16 +553,18 @@ end
 
 
 -- Helper Function to save the current/next dialogue into the savedVariables
-function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
-    local savedName = CurrentDialogue.name
+function UpdateDialogue(Dialogue, NextID, dialogueEnds)
+    local savedName = Dialogue.Name
+    local npcID = hashString(Dialogue.Name)
     if dialogueEnds ~= true then
         CurrentID = tonumber(NextID)
         -- Iterate through each element in the table
+        
         for i, dialogue in ipairs(Dialogues) do
             idCheck = tostring(CurrentID)
             -- Check if the current element's id matches the id we are looking for
             if dialogue.id == idCheck then
-                -- If it matches, save the current element to the CurrentDialogue variable
+                -- If it matches, save the current element to the Dialogue variable
                 CurrentDialogue = dialogue
                 -- Exit the loop since we have found the element we are looking for
                 break
@@ -517,7 +573,6 @@ function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
 
 
         -- CurrentDialogue = Dialogues[CurrentID]
-
 
         UpdateFrame(CurrentDialogue)
         NextID = nil
@@ -528,7 +583,7 @@ function UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, Dialogues)
         end
         QuestionFrame:Hide()
         ShowUI()
-        CurrentID = StoryExtendedDB[CurrentDialogue.Name][targetName]
+        CurrentID = StoryExtendedDB[npcID][targetName]
         dialogueEnds = false
         NextID = nil
     end
@@ -537,7 +592,8 @@ end
 
 -- Function to check if the players target is an NPC with Dialogue
 local function IsNPC(targetName)
-    if targetName ~= nil and StoryExtendedDB[CurrentDialogue.Name][targetName] == nil then
+    local npcID = hashString(CurrentDialogue.Name)
+    if targetName ~= nil and StoryExtendedDB[npcID][targetName] == nil then
         for keys, value in pairs(NamesWithDialogue) do
             if NamesWithDialogue[keys] == targetName then
                 return true
@@ -548,9 +604,9 @@ local function IsNPC(targetName)
     --         CurrentID = Dialogues[key]
     --     end
     -- end
-    StoryExtendedDB[CurrentDialogue.Name][targetName] = CurrentID
-    elseif targetName ~= nil and StoryExtendedDB[CurrentDialogue.Name][targetName] ~= nil then
-        CurrentID = StoryExtendedDB[CurrentDialogue.Name][targetName]
+    StoryExtendedDB[npcID][targetName] = CurrentID
+    elseif targetName ~= nil and StoryExtendedDB[npcID][targetName] ~= nil then
+        CurrentID = StoryExtendedDB[npcID][targetName]
         return true
     end
     return false, nil
@@ -571,24 +627,18 @@ local function chooseDatabase(targetName)
         for key, value in pairs(checkDialogues) do
             if (targetName == checkDialogues[key].Name and checkDialogues[key].Greeting == "true") then
                 internalConditionSuccess = StartConditionCheck(targetName, checkDialogues[key].ConditionType, checkDialogues[key].ConditionValue)
-                print("Name: ", checkDialogues[key].Name, " Condition: ", internalConditionSuccess)
                 -- If we have a condition success we have to check if any dialogues further down the line are also eligable
                 -- if (conditionSuccess == false) then
                 --     return nil
                 -- end
                 if (internalConditionSuccess == true) then
-                    print(addonName, "ID: ", checkDialogues[key].id)
                     foundNpcDialogues[#foundNpcDialogues+1] = checkDialogues[key]
                     CurrentID = tonumber(checkDialogues[key].id)
                     conditionSuccess = true
-                    print(checkDialogues[key].Name, "Found in DataAddon:", addonName)
-                    print(#foundNpcDialogues)
                 end
             end
         end
         if (foundNpcDialogues ~= nil and #foundNpcDialogues > 0) then
-            print("Found something")
-            print("CurrentID: ", CurrentID)
             return dialogueData, conditionSuccess
         end
     end
@@ -608,6 +658,7 @@ local function TalkStoryFunc(zone_input)
     end
     --local isNPC = IsNPC(targetName)
     local isCondition
+    print("Loading new dialogues table")
     Dialogues, isCondition = chooseDatabase(targetName)
     if isCondition then
         -- If the target NPC is already in the Saved Variables then we take its last Dialogue ID
@@ -662,7 +713,13 @@ TalkStoryButton:SetScript("OnClick", function() TalkStoryFunc(nil) end)
 -- starts the start dialogue function after zone change (if there is a valid dialogue to be shown there)
 local function OnZoneChanged()
     local subzone = GetSubZoneText()
-    C_Timer.After(2, function() TalkStoryFunc(subzone) end)
+    -- For now we do the database lookup for the subzone everytime you enter a subzone. Will change this later
+    local ZoneInDatabase
+    local ZoneInDatabase2
+    ZoneInDatabase, ZoneInDatabase2 = chooseDatabase(subzone)
+    if (ZoneInDatabase ~= nil) then
+        C_Timer.After(2, function() TalkStoryFunc(subzone) end)
+    end
 end
 
 -- Register the zone change events to our OnZoneChanged script
