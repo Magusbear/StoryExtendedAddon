@@ -350,8 +350,8 @@ end)
 
 local currentSoundHandle
 -- Function to start playing dialogue sound files
-function PlayDialogue(CurrentDialogue)
-    local audioFile = "Interface\\Addons\\StoryExtended\\audio\\Dialogue\\"..CurrentDialogue.Name.."\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
+function PlayDialogue(CurrentDialogue, DatabaseName)
+    local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
     currentSoundHandle = select(2, PlaySoundFile(audioFile))
 end
 --END
@@ -411,7 +411,7 @@ end
 
 
 -- Function to update the text and buttons based on the NPC information
-local function UpdateFrame(CurrentDialogue, targetName)
+local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
     local npcIndexID = CurrentDialogue.id
     -- Do we have a valid NPC loaded? If not, then stop the function and hide the dialogue interface
     if CurrentDialogue == nil then
@@ -434,12 +434,7 @@ local function UpdateFrame(CurrentDialogue, targetName)
     end  
 
     if StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][npcIndexID] ~= nil and StoryExtendedDB[npcID][npcIndexID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
-        if StoryExtendedDB[npcID][npcIndexID].didOnce1 == "false" then
-            DialogueText:SetText(CurrentDialogue.Text)        
-            if CurrentDialogue.UseAudio == "true" then
-                PlayDialogue(CurrentDialogue)
-            end
-        else
+        if StoryExtendedDB[npcID][npcIndexID].didOnce1 == "true" then
             DialogueFrame:Hide()
             QuestionFrame:Hide()
             ShowUI()
@@ -448,7 +443,7 @@ local function UpdateFrame(CurrentDialogue, targetName)
     end
     DialogueText:SetText(CurrentDialogue.Text)        
     if CurrentDialogue.UseAudio == "true" then
-        PlayDialogue(CurrentDialogue)
+        PlayDialogue(CurrentDialogue, DatabaseName)
     end
     -- Set the button labels and enable/disable them based on the button information
     local QuestionCounter = 0
@@ -525,7 +520,7 @@ local function UpdateFrame(CurrentDialogue, targetName)
                     -- The GoToID1-4 becomes our NextID to grab our dialogue from
                     NextID = CurrentDialogue[GoToID]
                     -- Update Dialogue function handles grabbing the next dialogue file
-                    UpdateDialogue(CurrentDialogue, NextID, dialogueEnds)
+                    UpdateDialogue(CurrentDialogue, NextID, dialogueEnds, DatabaseName)
                 end)
                 -- Enable clicking the Question Buttons
                 QuestionButtons[i]:Enable()
@@ -553,7 +548,7 @@ end
 
 
 -- Helper Function to save the current/next dialogue into the savedVariables
-function UpdateDialogue(Dialogue, NextID, dialogueEnds)
+function UpdateDialogue(Dialogue, NextID, dialogueEnds, DatabaseName)
     local savedName = Dialogue.Name
     local npcID = hashString(Dialogue.Name)
     if dialogueEnds ~= true then
@@ -574,7 +569,7 @@ function UpdateDialogue(Dialogue, NextID, dialogueEnds)
 
         -- CurrentDialogue = Dialogues[CurrentID]
 
-        UpdateFrame(CurrentDialogue)
+        UpdateFrame(CurrentDialogue, nil, DatabaseName)
         NextID = nil
     else
         DialogueFrame:Hide()
@@ -639,7 +634,7 @@ local function chooseDatabase(targetName)
             end
         end
         if (foundNpcDialogues ~= nil and #foundNpcDialogues > 0) then
-            return dialogueData, conditionSuccess
+            return dialogueData, conditionSuccess, addonName
         end
     end
     return nil, false
@@ -658,8 +653,9 @@ local function TalkStoryFunc(zone_input)
     end
     --local isNPC = IsNPC(targetName)
     local isCondition
+    local DatabaseName
     print("Loading new dialogues table")
-    Dialogues, isCondition = chooseDatabase(targetName)
+    Dialogues, isCondition, DatabaseName = chooseDatabase(targetName)
     if isCondition then
         -- If the target NPC is already in the Saved Variables then we take its last Dialogue ID
 
@@ -682,7 +678,7 @@ local function TalkStoryFunc(zone_input)
                 -- Hide all UI elements but the dialogue UI, if the option is activated
                 HideUI()
                 -- The player is close enough to talk to the target
-                UpdateFrame(CurrentDialogue)
+                UpdateFrame(CurrentDialogue, nil, DatabaseName)
 
             else
                 -- The player is too far away to talk to the target
@@ -694,7 +690,7 @@ local function TalkStoryFunc(zone_input)
             HideUI()
             DialogueFrame:Show()
             QuestionFrame:Show()
-            UpdateFrame(CurrentDialogue, targetName)
+            UpdateFrame(CurrentDialogue, targetName, DatabaseName)
 
         end
         --CurrentDialogue = Dialogues[CurrentID]
