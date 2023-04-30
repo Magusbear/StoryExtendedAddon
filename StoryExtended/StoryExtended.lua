@@ -16,6 +16,7 @@ local HiddenUIParts = {}
 local NamesWithDialogue = {}
 local CurrentDialogue
 local currentDataAddon = nil
+local nameList = {}
 
 
 
@@ -247,6 +248,23 @@ local function StoryExtended_OnEvent(self, event, addonName)
 end
 --END
 
+
+local function createNameList()
+    --check which data addon to use
+    print("test")
+    for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do
+        local dialogueData = dataAddon.GetDialogue
+        local checkDialogues = dialogueData
+        for key, value in pairs(checkDialogues) do
+            if not table.concat(nameList, ","):find(checkDialogues[key].Name) then
+                table.insert(nameList, checkDialogues[key].Name)
+            end
+        end
+    end
+end
+
+createNameList()
+
 -- Helper Frame to make StoryExtended_OnEvent listen to events
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
@@ -276,6 +294,10 @@ DialogueFrame:EnableMouse(letMoveFrames)
 DialogueFrame:RegisterForDrag("LeftButton")
 DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
 DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
+DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
+    TalkStoryButton:Show()
+end)
+
 
 -- Create a text label and set its properties
 local DialogueText = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -283,7 +305,6 @@ DialogueText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
 DialogueText:SetPoint("BOTTOMRIGHT", DialogueFrame, "BOTTOMRIGHT", -16, 16)
 DialogueText:SetJustifyH("LEFT")
 DialogueText:SetFont(DialogueText:GetFont(), 20)
-
 
 -- Create a question frame for the dialogue questions
 local QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent, "BackdropTemplate")
@@ -302,6 +323,7 @@ QuestionFrame:EnableMouse(letMoveFrames)
 QuestionFrame:RegisterForDrag("LeftButton")
 QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
 QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
+tinsert(UISpecialFrames, "QuestionFrame")
 -- Create a text label and set its properties
 local QuestionText = QuestionFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal", "BackdropTemplate")
 QuestionText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
@@ -331,6 +353,7 @@ for i = 1, 4 do
     text:SetPoint("CENTER")
     text:SetTextColor(1, 1, 1)
     QuestionButtons[i] = QuestionButton
+    tinsert(UISpecialFrames, "QuestionButton"..i)
 end
 QuestionButtons[1]:SetPoint("TOPLEFT", QuestionFrame, "TOPLEFT", 10, -10)
 for i = 2, 4 do
@@ -338,55 +361,81 @@ for i = 2, 4 do
 end
 
 -- Add texture to name plate of NPC if they have dialogue
-local icon = nil
+
+local DialogueMarkerIcon = nil
 local targetIcon = nil
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_TARGET_CHANGED")
-frame:SetScript("OnEvent", function()
+local DialogueMarkerBorder = nil
+local targetIconBorder = nil
+local DialogueMarkerFrame = CreateFrame("Frame", "DialogueMarkerFrame")
+DialogueMarkerFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+DialogueMarkerFrame:SetScript("OnEvent", function()
     if UnitExists("target") and UnitClassification("target") == "normal" then
         local name = UnitName("target")
-        if name == "Gornek" then
+        if table.concat(nameList, ","):find(name) then
             -- Add texture to TalkStoryButton
             local button = getglobal("TalkStoryButton")
-            if not icon then
-                icon = button:CreateTexture(nil, "OVERLAY")
-                icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-                icon:SetWidth(32)
-                icon:SetHeight(32)
-                icon:SetPoint("LEFT", button, "RIGHT", 5, 0)
-                icon:SetTexCoord(0, 1, 0, 1)
+            if not DialogueMarkerIcon then
+                DialogueMarkerIcon = button:CreateTexture(nil, "OVERLAY")
+                DialogueMarkerIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                DialogueMarkerIcon:SetWidth(34)
+                DialogueMarkerIcon:SetHeight(34)
+                DialogueMarkerIcon:SetPoint("LEFT", button, "RIGHT", -10, 0)
+                DialogueMarkerIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1) -- adjust the draw layer as needed
+                DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
+                DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                DialogueMarkerBorder:SetWidth(65) -- adjust the width and height to match the border image size
+                DialogueMarkerBorder:SetHeight(65)
+                DialogueMarkerBorder:SetPoint("CENTER", DialogueMarkerIcon, "CENTER", 12, -15) -- set the position to match the icon
+                DialogueMarkerBorder:SetDrawLayer("BORDER")
             else
-                icon:Show()
+                DialogueMarkerIcon:Show()
+                DialogueMarkerBorder:Show()
             end
 
-            -- Add texture to target frame
+            -- -- Add texture to target DialogueMarkerFrame
             if not targetIcon then
                 targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
-                targetIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-                targetIcon:SetWidth(32)
-                targetIcon:SetHeight(32)
-                targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 65, -28)
-                targetIcon:SetTexCoord(0, 1, 0, 1)
+                targetIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                targetIcon:SetWidth(26)
+                targetIcon:SetHeight(26)
+                targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
+                targetIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                targetIcon:SetDrawLayer("OVERLAY", 1) -- adjust the draw layer as needed
+                targetIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
+                targetIconBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                targetIconBorder:SetWidth(50) -- adjust the width and height to match the border image size
+                targetIconBorder:SetHeight(50)
+                targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11) -- set the position to match the icon
+                targetIconBorder:SetDrawLayer("OVERLAY", 2) -- adjust the draw layer as needed
             else
                 targetIcon:Show()
+                targetIconBorder:Show()
             end
         else
-            if icon then
-                icon:Hide()
+            if DialogueMarkerIcon ~= nil then
+                DialogueMarkerIcon:Hide()
+                DialogueMarkerBorder:Hide()
             end
-            if targetIcon then
+            if targetIcon ~= nil then
                 targetIcon:Hide()
+                targetIconBorder:Hide()
             end
         end
     else
-        if icon then
-            icon:Hide()
+        if DialogueMarkerIcon ~= nil then
+            DialogueMarkerIcon:Hide()
+            DialogueMarkerBorder:Hide()
         end
-        if targetIcon then
+        if targetIcon ~= nil then
             targetIcon:Hide()
+            targetIconBorder:Hide()
         end
     end
 end)
+
 -- END
 
 -- Couple of functions ahead
