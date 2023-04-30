@@ -294,6 +294,7 @@ DialogueFrame:EnableMouse(letMoveFrames)
 DialogueFrame:RegisterForDrag("LeftButton")
 DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
 DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
+tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
 DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
     TalkStoryButton:Show()
 end)
