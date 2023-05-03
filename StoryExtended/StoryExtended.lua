@@ -305,7 +305,7 @@ end
 --
 -- Function for getting Quest ID
 local function getCurrentQuestID(questName)
-local foundQuestID
+local foundQuestID = 0
 for id, loc in pairs(pfDB["quests"]["enUS"]) do                                     -- Searching the pfDB for the completed quest name
     locText = loc["T"]                                                              -- "T" is the Title of the quest which I check against the input quest name
     if locText == questName then
