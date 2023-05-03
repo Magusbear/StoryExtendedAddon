@@ -1,0 +1,8 @@
+## Title: StoryExtended
+## Version: 0.1
+## Interface: 48632
+## SavedVariablesPerCharacter: StoryExtendedDB
+## SavedVariables: GlobalStoryExtendedDB
+db\quests.lua
+embeds.xml
+StoryExtended.lua

@@ -17,10 +17,43 @@ local NamesWithDialogue = {}
 local CurrentDialogue
 local currentDataAddon = nil
 local nameList = {}
-
-
-
 local CURRENT_DATA_ADDON_VERSION = 1;
+local currentQuestList = {}
+
+-- Helper Functions shamelefully "borrowed" from AI_VoiceOver by MrThinger, will ask for permission and forgiveness later!
+if not print then
+    function print(...)
+        local text = ""
+        for i = 1, arg.n do
+            text = text .. (i > 1 and " " or "") .. tostring(arg[i])
+        end
+        DEFAULT_CHAT_FRAME:AddMessage(text)
+    end
+end
+
+if not select then
+    function select(index, ...)
+        if index == "#" then
+            return arg.n
+        else
+            local result = {}
+            for i = index, arg.n do
+                table.insert(result, arg[i])
+            end
+            return unpack(result)
+        end
+    end
+end
+-- ^^^ Helper Functions shamelefully "borrowed" from AI_VoiceOver by MrThinger, will ask for permission and forgiveness later!
+
+local CLIENT_VERSION, BUILD = GetBuildInfo()
+-- print(CLIENT_VERSION)
+if CLIENT_VERSION == "1.16.5" then
+    -- Client version is 1.12 or below
+else
+    -- Client version is higher than 1.12
+end
+
 
 dialogueDataAddons =
 {
@@ -34,6 +67,7 @@ dialogueDataAddons =
 -- Register the data addons
 
 function StoryExtended:Register(name, dataAddon)
+    --print("Register addon...")
     assert(not dialogueDataAddons.registeredDataAddons[name], format([[Data addon "%s" already registered]], name))
 
     local metadata = assert(dialogueDataAddons.availableDataAddons[name],
@@ -109,23 +143,25 @@ function StoryExtended:OnInitialize()
 end
 
 function StoryExtended:OnEnable()
-    StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)
-    LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_options", options)
-    StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_options", "StoryExtended")
-  --  LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_general", general)
---	StoryExtended.generalframe = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_general", "General", "StoryExtended")
+    if string.sub(CLIENT_VERSION, 1, 1) ~= "1" then
+        StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)
+        LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_options", options)
+        StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_options", "StoryExtended")
+    --  LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_general", general)
+    --	StoryExtended.generalframe = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_general", "General", "StoryExtended")
 
-    local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)
-    LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_Profiles", profile)
-    LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_Profiles", "Profiles", "StoryExtended")
+        local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)
+        LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_Profiles", profile)
+        LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_Profiles", "Profiles", "StoryExtended")
 
-    StoryExtended:RegisterChatCommand("se", "SlashCommand")
-	StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")
-    HideUIOption = StoryExtended.db.profile.HideUIOption
-    lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
-    letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
-    --HideUIOption = StoryExtended.db.profile.HideUIOption
-    -- Called when the addon is enabled
+        StoryExtended:RegisterChatCommand("se", "SlashCommand")
+        StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")
+        HideUIOption = StoryExtended.db.profile.HideUIOption
+        lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+        letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+        --HideUIOption = StoryExtended.db.profile.HideUIOption
+        -- Called when the addon is enabled
+    end
 end
 
 function StoryExtended:OnDisable()
@@ -168,12 +204,21 @@ checkLoadDataAddons()
 
 -- For saving the Character names as numeric values because SavedVariables doesnt like non-numeric values as index
 local function hashString(str)
-    local sum = 0
-    for i = 1, #str do
-      sum = sum + string.byte(str, i)
-    end
-    return sum
-  end
+    -- if CLIENT_VERSION == "1.16.5" then
+    --     local sum = 0
+    --     for i = 1, len(str) do
+    --         sum = sum + string.byte(str, i)
+    --     end
+    --     return sum
+    -- else
+    --     print(CLIENT_VERSION)
+        local sum = 0
+        for i = 1, string.len(str) do
+            sum = sum + string.byte(str, i)
+        end
+        return sum
+    -- end
+end
 
 -- Hide the UI (if the option is set)
 local function HideUI()
@@ -225,45 +270,111 @@ end
 
 -- Function that saves data into SavedVariables
 local function StoryExtended_OnEvent(self, event, addonName)
-    if event == "ADDON_LOADED" and addonName == "StoryExtended" then
-        -- Initialize the StoryExtendedDB table with defaults
-        if not StoryExtendedDB then
-            StoryExtendedDB = {}
+    -- wow 1.12 saves a tad bit differently into SavedVariables
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        if event == "ADDON_LOADED" and addonName == "StoryExtended" then
+            if not StoryExtendedDB then
+                StoryExtendedDB = {}
+            end
         end
-        -- Load saved database if it exists
-        if SavedStoryExtendedDB then
-            StoryExtendedDB = SavedStoryExtendedDB
-        end
-    elseif event == "PLAYER_LOGOUT" then
-        print(StoryExtended.db)
-        -- StoryExtended.db:Save()
-        -- if StoryExtended.db then
-        --    GlobalStoryExtendedDB = StoryExtended.db
-        -- end
-        -- Save the StoryExtendedDB table to the SavedVariables file
-        if StoryExtendedDB then
-            SavedStoryExtendedDB = StoryExtendedDB
+    else
+        if event == "ADDON_LOADED" and addonName == "StoryExtended" then
+            -- Initialize the StoryExtendedDB table with defaults
+            if not StoryExtendedDB then
+                StoryExtendedDB = {}
+            end
+            -- Load saved database if it exists
+            if SavedStoryExtendedDB then
+                StoryExtendedDB = SavedStoryExtendedDB
+            end
+        elseif event == "PLAYER_LOGOUT" then
+            if StoryExtendedDB then
+                SavedStoryExtendedDB = StoryExtendedDB
+            end
         end
     end
 end
 --END
 
 
+-- Workaround for storing completed Quests for wow 1.12
+--      WoW 1.12 does not have functionality for checking a QuestID for its QuestComplete status
+--      It also does not have a function to get a quest ID from anything
+--      I borrowed the Questlist from pfQuest to use it as a lookup table for the QuestIDs
+--      Depending on if Shagu wants to give out this list or not I am either going to make my own or make his Addon a dependency
+--
+-- Function for getting Quest ID
+local function getCurrentQuestID(questName)
+local foundQuestID
+for id, loc in pairs(pfDB["quests"]["enUS"]) do                                     -- Searching the pfDB for the completed quest name
+    locText = loc["T"]                                                              -- "T" is the Title of the quest which I check against the input quest name
+    if locText == questName then
+        foundQuestID = id                                                           -- the keys of this table are the id's
+    end
+end
+return foundQuestID
+end
+
+-- Mark the quest as finished in the SavedVariables
+function markQuestFinished(questId)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        if not StoryExtendedDB[99999] then                                          -- The table keys are numericals so I chose a high number for the QuestList
+            StoryExtendedDB[99999] = {}                                             -- Create the table if it doesn't exist
+        end
+        StoryExtendedDB[99999][questId] = true                                      -- Write the questID and set it to true
+    end
+end
+
+-- Save the original QuestRewardCompleteButton function into a variable for later use
+local originalQuestRewardCompleteButton_OnClick
+originalQuestRewardCompleteButton_OnClick = QuestRewardCompleteButton_OnClick
+
+-- Overwritten Complete Quest btn function
+function customQuestRewardCompleteButton_OnClick() 
+	local rewardTitle = GetTitleText();                                             -- Get Quest Text from Title
+    local finishedQuestId = getCurrentQuestID(rewardTitle)                          -- Call function to get Quest ID
+    markQuestFinished(finishedQuestId)                                              -- Mark Quest ID as finished in SavedVariables
+    originalQuestRewardCompleteButton_OnClick()                                     -- Call original Quest Complete function
+end
+-- Overwrite Complete Quest button 
+QuestRewardCompleteButton_OnClick = customQuestRewardCompleteButton_OnClick
+
+-- If players want or have to set a quest to finished manually
+local function ManualQuestFinish(questID)
+    if not StoryExtendedDB[99999] then
+        StoryExtendedDB[99999] = {}
+    end
+    StoryExtendedDB[99999][questID] = true
+end
+ManualQuestFinish(4641)
+
+-- End of storing completed Quests for wow 1.12 workaround
+
+-- Create a list of all NPC with dialgue
 local function createNameList()
-    --check which data addon to use
-    print("test")
-    for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do
-        local dialogueData = dataAddon.GetDialogue
-        local checkDialogues = dialogueData
-        for key, value in pairs(checkDialogues) do
-            if not table.concat(nameList, ","):find(checkDialogues[key].Name) then
-                table.insert(nameList, checkDialogues[key].Name)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        for _, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do
+            local dialogueData = dataAddon.GetDialogue
+            local checkDialogues = dialogueData
+            for _, dialogData in ipairs(checkDialogues) do
+                if not string.find(table.concat(nameList, ","), dialogData.Name) then
+                    table.insert(nameList, dialogData.Name)
+                end
+            end
+        end
+    else
+        --check which data addon to use
+        for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do
+            local dialogueData = dataAddon.GetDialogue
+            local checkDialogues = dialogueData
+            for key, value in pairs(checkDialogues) do
+                if not table.concat(nameList, ","):find(checkDialogues[key].Name) then
+                    table.insert(nameList, checkDialogues[key].Name)
+                end
             end
         end
     end
 end
-
-createNameList()
 
 -- Helper Frame to make StoryExtended_OnEvent listen to events
 local frame = CreateFrame("Frame")
@@ -275,30 +386,55 @@ frame:SetScript("OnEvent", StoryExtended_OnEvent)
 -- Create a frame to hold the dialogue
 --
 -- Create the frame itself with graphics
-local DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent, "BackdropTemplate")
-DialogueFrame:SetWidth(600)
-DialogueFrame:SetHeight(150)
-DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 100)
-if HideUIOption == true then
-    DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    local DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent)
+    DialogueFrame:SetWidth(600)
+    DialogueFrame:SetHeight(150)
+    DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 100)
+    if HideUIOption == true then
+        DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+    end
+    DialogueFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    DialogueFrame:SetBackdropColor(0, 0, 0, 1)
+    DialogueFrame:SetMovable(letMoveFrames)
+    DialogueFrame:EnableMouse(letMoveFrames)
+    DialogueFrame:RegisterForDrag("LeftButton")
+    DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
+    DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
+    DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
+        TalkStoryButton:Show()
+    end)
+else
+    local DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent, "BackdropTemplate")
+    DialogueFrame:SetWidth(600)
+    DialogueFrame:SetHeight(150)
+    DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 100)
+    if HideUIOption == true then
+        DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+    end
+    DialogueFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    DialogueFrame:SetBackdropColor(0, 0, 0, 1)
+    DialogueFrame:SetMovable(letMoveFrames)
+    DialogueFrame:EnableMouse(letMoveFrames)
+    DialogueFrame:RegisterForDrag("LeftButton")
+    DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
+    DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
+    DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
+        TalkStoryButton:Show()
+    end)
 end
-DialogueFrame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
-})
-DialogueFrame:SetBackdropColor(0, 0, 0, 1)
-DialogueFrame:SetMovable(letMoveFrames)
-DialogueFrame:EnableMouse(letMoveFrames)
-DialogueFrame:RegisterForDrag("LeftButton")
-DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
-DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
-tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
-DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
-    TalkStoryButton:Show()
-end)
-
 
 -- Create a text label and set its properties
 local DialogueText = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -307,60 +443,113 @@ DialogueText:SetPoint("BOTTOMRIGHT", DialogueFrame, "BOTTOMRIGHT", -16, 16)
 DialogueText:SetJustifyH("LEFT")
 DialogueText:SetFont(DialogueText:GetFont(), 20)
 
--- Create a question frame for the dialogue questions
-local QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent, "BackdropTemplate")
-QuestionFrame:SetWidth(300)
-QuestionFrame:SetHeight(200)
-QuestionFrame:SetPoint("RIGHT", UIParent, "RIGHT", -100, -100)
-QuestionFrame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
-})
-QuestionFrame:SetBackdropColor(0, 0, 0, 1)
-QuestionFrame:SetMovable(letMoveFrames)
-QuestionFrame:EnableMouse(letMoveFrames)
-QuestionFrame:RegisterForDrag("LeftButton")
-QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
-QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
-tinsert(UISpecialFrames, "QuestionFrame")
--- Create a text label and set its properties
-local QuestionText = QuestionFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal", "BackdropTemplate")
-QuestionText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
-QuestionText:SetPoint("BOTTOMRIGHT", DialogueFrame, "BOTTOMRIGHT", -16, 16)
-QuestionText:SetJustifyH("LEFT")
-QuestionText:SetFont(QuestionText:GetFont(), 20)
-
+-- Have to omit "BackdropTemplate" for wow 1.12
+if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    -- WOW 1.12
+    -- Create a question frame for the dialogue questions
+    local QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent)
+    QuestionFrame:SetWidth(300)
+    QuestionFrame:SetHeight(200)
+    QuestionFrame:SetPoint("RIGHT", UIParent, "RIGHT", -100, -100)
+    QuestionFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    QuestionFrame:SetBackdropColor(0, 0, 0, 1)
+    QuestionFrame:SetMovable(letMoveFrames)
+    QuestionFrame:EnableMouse(letMoveFrames)
+    QuestionFrame:RegisterForDrag("LeftButton")
+    QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
+    QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "QuestionFrame")
+    -- Create a text label and set its properties
+    local QuestionText = QuestionFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal", "BackdropTemplate")
+    QuestionText:SetPoint("CENTER", QuestionFrame, "CENTER", 0, 0)
+   -- QuestionText:SetPoint("BOTTOMRIGHT", QuestionFrame, "BOTTOMRIGHT", -16, 16)
+    QuestionText:SetJustifyH("CENTER")
+    QuestionText:SetFont(QuestionText:GetFont(), 20)
+else
+    -- NEW WoW
+    -- Create a question frame for the dialogue questions
+    local QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent, "BackdropTemplate")
+    QuestionFrame:SetWidth(300)
+    QuestionFrame:SetHeight(200)
+    QuestionFrame:SetPoint("RIGHT", UIParent, "RIGHT", -100, -100)
+    QuestionFrame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    })
+    QuestionFrame:SetBackdropColor(0, 0, 0, 1)
+    QuestionFrame:SetMovable(letMoveFrames)
+    QuestionFrame:EnableMouse(letMoveFrames)
+    QuestionFrame:RegisterForDrag("LeftButton")
+    QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
+    QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "QuestionFrame")
+    -- Create a text label and set its properties
+    local QuestionText = QuestionFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal", "BackdropTemplate")
+    QuestionText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
+    QuestionText:SetPoint("BOTTOMRIGHT", DialogueFrame, "BOTTOMRIGHT", -16, 16)
+    QuestionText:SetJustifyH("LEFT")
+    QuestionText:SetFont(QuestionText:GetFont(), 20)
+end
 
 -- Create 4 question buttons within the Question Frame
 local QuestionButtons = {}
 for i = 1, 4 do
-    local QuestionButton = CreateFrame("Button", "QuestionButton"..i, UIParent, "BackdropTemplate")
-    QuestionButton:SetSize(QuestionFrame:GetWidth() * 0.93, QuestionFrame:GetHeight() * 0.75 / 4)
-    QuestionButton:SetText(" ")
-    QuestionButton:SetFrameStrata("HIGH")
-    QuestionButton:SetNormalFontObject("GameFontNormalLarge")
-    QuestionButton:SetHighlightFontObject("GameFontHighlightLarge")
-    QuestionButton:SetBackdrop({
-        bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
-    QuestionButton:SetBackdropColor(0, 0, 0, 1)
-    QuestionButton:SetBackdropBorderColor(1, 1, 1, 1)
-    local text = QuestionButton:GetFontString()
-    text:SetPoint("CENTER")
-    text:SetTextColor(1, 1, 1)
-    QuestionButtons[i] = QuestionButton
-    tinsert(UISpecialFrames, "QuestionButton"..i)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        local QuestionButton = CreateFrame("Button", "QuestionButton"..i, UIParent)
+        QuestionButton:SetWidth(QuestionFrame:GetWidth() * 0.93)
+        QuestionButton:SetHeight(QuestionFrame:GetHeight() * 0.75 / 4)
+        QuestionButton:SetText(" ")
+        QuestionButton:SetFrameStrata("HIGH")
+        QuestionButton:SetFont("Fonts\\FRIZQT__.TTF", 14)
+        QuestionButton:SetHighlightFontObject("GameFontHighlightLarge")
+        QuestionButton:SetBackdrop({
+            bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 }
+        })
+        QuestionButton:SetBackdropColor(0, 0, 0, 1)
+        QuestionButton:SetBackdropBorderColor(1, 1, 1, 1)
+        local text = QuestionButton:GetFontString()
+        text:SetPoint("CENTER", QuestionButton, "CENTER")
+        text:SetTextColor(1, 1, 1)
+        QuestionButtons[i] = QuestionButton
+        tinsert(UISpecialFrames, "QuestionButton"..i)
+    else
+        local QuestionButton = CreateFrame("Button", "QuestionButton"..i, UIParent, "BackdropTemplate")
+        QuestionButton:SetSize(QuestionFrame:GetWidth() * 0.93, QuestionFrame:GetHeight() * 0.75 / 4)
+        QuestionButton:SetText(" ")
+        QuestionButton:SetFrameStrata("HIGH")
+        QuestionButton:SetNormalFontObject("GameFontNormalLarge")
+        QuestionButton:SetHighlightFontObject("GameFontHighlightLarge")
+        QuestionButton:SetBackdrop({
+            bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+            edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 }
+        })
+        QuestionButton:SetBackdropColor(0, 0, 0, 1)
+        QuestionButton:SetBackdropBorderColor(1, 1, 1, 1)
+        local text = QuestionButton:GetFontString()
+        text:SetPoint("CENTER")
+        text:SetTextColor(1, 1, 1)
+        QuestionButtons[i] = QuestionButton
+        tinsert(UISpecialFrames, "QuestionButton"..i)
+    end
 end
 QuestionButtons[1]:SetPoint("TOPLEFT", QuestionFrame, "TOPLEFT", 10, -10)
 for i = 2, 4 do
     QuestionButtons[i]:SetPoint("TOPLEFT", QuestionButtons[i-1], "BOTTOMLEFT", 0, -10)
 end
 
+createNameList()
 -- Add texture to name plate of NPC if they have dialogue
 
 local DialogueMarkerIcon = nil
@@ -370,50 +559,63 @@ local targetIconBorder = nil
 local DialogueMarkerFrame = CreateFrame("Frame", "DialogueMarkerFrame")
 DialogueMarkerFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 DialogueMarkerFrame:SetScript("OnEvent", function()
-    if UnitExists("target") and UnitClassification("target") == "normal" then
-        local name = UnitName("target")
-        if table.concat(nameList, ","):find(name) then
-            -- Add texture to TalkStoryButton
-            local button = getglobal("TalkStoryButton")
-            if not DialogueMarkerIcon then
-                DialogueMarkerIcon = button:CreateTexture(nil, "OVERLAY")
-                DialogueMarkerIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
-                DialogueMarkerIcon:SetWidth(34)
-                DialogueMarkerIcon:SetHeight(34)
-                DialogueMarkerIcon:SetPoint("LEFT", button, "RIGHT", -10, 0)
-                DialogueMarkerIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
-                DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1) -- adjust the draw layer as needed
-                DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
-                DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
-                DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
-                DialogueMarkerBorder:SetWidth(65) -- adjust the width and height to match the border image size
-                DialogueMarkerBorder:SetHeight(65)
-                DialogueMarkerBorder:SetPoint("CENTER", DialogueMarkerIcon, "CENTER", 12, -15) -- set the position to match the icon
-                DialogueMarkerBorder:SetDrawLayer("BORDER")
-            else
-                DialogueMarkerIcon:Show()
-                DialogueMarkerBorder:Show()
-            end
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        if UnitExists("target") and UnitClassification("target") == "normal" then
+            local name = UnitName("target")
+            if string.find(table.concat(nameList, ","), name) then
+                -- Add texture to TalkStoryButton
+                local button = getglobal("TalkStoryButton")
+                if not DialogueMarkerIcon then
+                    DialogueMarkerIcon = button:CreateTexture(nil, "OVERLAY")
+                    DialogueMarkerIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                    DialogueMarkerIcon:SetWidth(34)
+                    DialogueMarkerIcon:SetHeight(34)
+                    DialogueMarkerIcon:SetPoint("LEFT", button, "RIGHT", -10, 0)
+                    DialogueMarkerIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                    DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1) -- adjust the draw layer as needed
+                    -- SetMask does not exist yet in wow 1.12
+                    -- DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                    DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
+                    DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                    DialogueMarkerBorder:SetWidth(65) -- adjust the width and height to match the border image size
+                    DialogueMarkerBorder:SetHeight(65)
+                    DialogueMarkerBorder:SetPoint("CENTER", DialogueMarkerIcon, "CENTER", 12, -15) -- set the position to match the icon
+                    DialogueMarkerBorder:SetDrawLayer("BORDER")
+                else
+                    DialogueMarkerIcon:Show()
+                    DialogueMarkerBorder:Show()
+                end
 
-            -- -- Add texture to target DialogueMarkerFrame
-            if not targetIcon then
-                targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
-                targetIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
-                targetIcon:SetWidth(26)
-                targetIcon:SetHeight(26)
-                targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
-                targetIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
-                targetIcon:SetDrawLayer("OVERLAY", 1) -- adjust the draw layer as needed
-                targetIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
-                targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
-                targetIconBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
-                targetIconBorder:SetWidth(50) -- adjust the width and height to match the border image size
-                targetIconBorder:SetHeight(50)
-                targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11) -- set the position to match the icon
-                targetIconBorder:SetDrawLayer("OVERLAY", 2) -- adjust the draw layer as needed
+                -- -- Add texture to target DialogueMarkerFrame
+                if not targetIcon then
+                    targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
+                    targetIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                    targetIcon:SetWidth(26)
+                    targetIcon:SetHeight(26)
+                    targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
+                    targetIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                    targetIcon:SetDrawLayer("BACKGROUND", 1) -- adjust the draw layer as needed
+                    -- SetMask does not exist yet in wow 1.12
+                    -- targetIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                    targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
+                    targetIconBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                    targetIconBorder:SetWidth(50) -- adjust the width and height to match the border image size
+                    targetIconBorder:SetHeight(50)
+                    targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11) -- set the position to match the icon
+                    targetIconBorder:SetDrawLayer("BORDER", 2) -- adjust the draw layer as needed
+                else
+                    targetIcon:Show()
+                    targetIconBorder:Show()
+                end
             else
-                targetIcon:Show()
-                targetIconBorder:Show()
+                if DialogueMarkerIcon ~= nil then
+                    DialogueMarkerIcon:Hide()
+                    DialogueMarkerBorder:Hide()
+                end
+                if targetIcon ~= nil then
+                    targetIcon:Hide()
+                    targetIconBorder:Hide()
+                end
             end
         else
             if DialogueMarkerIcon ~= nil then
@@ -426,13 +628,70 @@ DialogueMarkerFrame:SetScript("OnEvent", function()
             end
         end
     else
-        if DialogueMarkerIcon ~= nil then
-            DialogueMarkerIcon:Hide()
-            DialogueMarkerBorder:Hide()
-        end
-        if targetIcon ~= nil then
-            targetIcon:Hide()
-            targetIconBorder:Hide()
+        if UnitExists("target") and UnitClassification("target") == "normal" then
+            local name = UnitName("target")
+            if table.concat(nameList, ","):find(name) then
+                -- Add texture to TalkStoryButton
+                local button = getglobal("TalkStoryButton")
+                if not DialogueMarkerIcon then
+                    DialogueMarkerIcon = button:CreateTexture(nil, "OVERLAY")
+                    DialogueMarkerIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                    DialogueMarkerIcon:SetWidth(34)
+                    DialogueMarkerIcon:SetHeight(34)
+                    DialogueMarkerIcon:SetPoint("LEFT", button, "RIGHT", -10, 0)
+                    DialogueMarkerIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                    DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1) -- adjust the draw layer as needed
+                    DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                    DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
+                    DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                    DialogueMarkerBorder:SetWidth(65) -- adjust the width and height to match the border image size
+                    DialogueMarkerBorder:SetHeight(65)
+                    DialogueMarkerBorder:SetPoint("CENTER", DialogueMarkerIcon, "CENTER", 12, -15) -- set the position to match the icon
+                    DialogueMarkerBorder:SetDrawLayer("BORDER")
+                else
+                    DialogueMarkerIcon:Show()
+                    DialogueMarkerBorder:Show()
+                end
+
+                -- -- Add texture to target DialogueMarkerFrame
+                if not targetIcon then
+                    targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
+                    targetIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
+                    targetIcon:SetWidth(26)
+                    targetIcon:SetHeight(26)
+                    targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
+                    targetIcon:SetVertexColor(1, 1, 1) -- reset any tint or color changes
+                    targetIcon:SetDrawLayer("OVERLAY", 1) -- adjust the draw layer as needed
+                    targetIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask") -- set the mask texture to make the icon round
+                    targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
+                    targetIconBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder") -- replace with the path to your border image
+                    targetIconBorder:SetWidth(50) -- adjust the width and height to match the border image size
+                    targetIconBorder:SetHeight(50)
+                    targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11) -- set the position to match the icon
+                    targetIconBorder:SetDrawLayer("OVERLAY", 2) -- adjust the draw layer as needed
+                else
+                    targetIcon:Show()
+                    targetIconBorder:Show()
+                end
+            else
+                if DialogueMarkerIcon ~= nil then
+                    DialogueMarkerIcon:Hide()
+                    DialogueMarkerBorder:Hide()
+                end
+                if targetIcon ~= nil then
+                    targetIcon:Hide()
+                    targetIconBorder:Hide()
+                end
+            end
+        else
+            if DialogueMarkerIcon ~= nil then
+                DialogueMarkerIcon:Hide()
+                DialogueMarkerBorder:Hide()
+            end
+            if targetIcon ~= nil then
+                targetIcon:Hide()
+                targetIconBorder:Hide()
+            end
         end
     end
 end)
@@ -444,15 +703,25 @@ end)
 local currentSoundHandle
 -- Function to start playing dialogue sound files
 function PlayDialogue(CurrentDialogue, DatabaseName)
-    local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
-    currentSoundHandle = select(2, PlaySoundFile(audioFile))
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
+        --DEFAULT_CHAT_FRAME:AddMessage(audioFile)
+        PlaySoundFile(audioFile)
+    else
+        local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
+        currentSoundHandle = select(2, PlaySoundFile(audioFile))
+    end
 end
 --END
 
 -- Function to stop playing current dialogue sound file
 function StopDialogue(CurrentDialogue)
-    if currentSoundHandle then
-        StopSound(currentSoundHandle)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+
+    else
+        if currentSoundHandle then
+            StopSound(currentSoundHandle)
+        end
     end
    -- currentSoundHandle = nil
 end
@@ -480,10 +749,24 @@ local function StartConditionCheck(targetName, conditionType, conditionValue)
     local npcID = hashString(targetName)
     if (conditionType == "level" and tonumber(playerLevel) >= tonumber(conditionValue)) then
         return true
-    elseif (conditionType == "quest-id" and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then
+    -- If the CLient version is higher than 1 (need to recheck if new classic wow is in this range) use C_QuestLog check
+    elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "quest-id" and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then
         return true
-    elseif (conditionType == "doFirst") then
+    -- If the client version is 1.12 or something similar dont use C_QuestLog
+    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "quest-id" and StoryExtendedDB[99999][(tonumber(conditionValue))] == true) then
+        return true
+    -- For new WoW
+    elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "doFirst") then
         local npcCheck, npcIdCheck = conditionValue:match("([^,]+),([^,]+)")
+        local hashedNpcCheck = hashString(npcCheck)       
+        if(StoryExtendedDB[hashedNpcCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] == true) then
+            return true
+        else
+            return false
+        end
+    -- Workaround for wow 1.12
+    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "doFirst") then
+        local npcCheck, npcIdCheck = string.match(conditionValue, "([^,]+),([^,]+)")
         local hashedNpcCheck = hashString(npcCheck)       
         if(StoryExtendedDB[hashedNpcCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck]["AlreadySeenAll"] == true) then
             return true
@@ -524,6 +807,25 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
     if not StoryExtendedDB[npcID][npcIndexID] then
         StoryExtendedDB[npcID][npcIndexID] = {}
         StoryExtendedDB[npcID][npcIndexID]["Name"] = CurrentDialogue.Name or {}
+
+
+        --testing
+        for npcID, subTable in pairs(StoryExtendedDB) do
+            for npcIndexID, nestedTable in pairs(subTable) do
+                if type(nestedTable) == "table" then
+                    for key, value in pairs(nestedTable) do
+                        if key == "Name" then
+                            DEFAULT_CHAT_FRAME:AddMessage("npcID: " .. npcID .. ", npcIndexID: " .. npcIndexID .. ", " .. key .. ": " .. value)
+                        end
+                    end
+                end
+            end
+        end
+
+
+
+
+
     end  
 
     if StoryExtendedDB[npcID] ~= nil and StoryExtendedDB[npcID][npcIndexID] ~= nil and StoryExtendedDB[npcID][npcIndexID].didOnce1 ~= nil then            --This is only important for zone changed triggered one time narration
@@ -712,7 +1014,16 @@ local function chooseDatabase(targetName)
         local foundNpcDialogues = {}
         local internalConditionSuccess = false
         local conditionSuccess = false
+        local count = 0
         for key, value in pairs(checkDialogues) do
+
+            -- Workaround for wow 1.12
+            count = 0
+            for key, value in pairs(foundNpcDialogues) do
+            count = count + 1
+            end
+            --workaround for wow 1.12
+
             if (targetName == checkDialogues[key].Name and checkDialogues[key].Greeting == "true") then
                 internalConditionSuccess = StartConditionCheck(targetName, checkDialogues[key].ConditionType, checkDialogues[key].ConditionValue)
                 -- If we have a condition success we have to check if any dialogues further down the line are also eligable
@@ -720,13 +1031,13 @@ local function chooseDatabase(targetName)
                 --     return nil
                 -- end
                 if (internalConditionSuccess == true) then
-                    foundNpcDialogues[#foundNpcDialogues+1] = checkDialogues[key]
+                    foundNpcDialogues[count+1] = checkDialogues[key]
                     CurrentID = tonumber(checkDialogues[key].id)
                     conditionSuccess = true
                 end
             end
         end
-        if (foundNpcDialogues ~= nil and #foundNpcDialogues > 0) then
+        if (foundNpcDialogues ~= nil and count > 0) then
             return dialogueData, conditionSuccess, addonName
         end
     end
@@ -735,6 +1046,7 @@ end
 
 -- Create a button to trigger the conversation
 local function TalkStoryFunc(zone_input)
+    getCurrentQuests()
     local targetName
     local isZone = false
     if zone_input ~= nil then
@@ -747,7 +1059,6 @@ local function TalkStoryFunc(zone_input)
     --local isNPC = IsNPC(targetName)
     local isCondition
     local DatabaseName
-    print("Loading new dialogues table")
     Dialogues, isCondition, DatabaseName = chooseDatabase(targetName)
     if isCondition then
         -- If the target NPC is already in the Saved Variables then we take its last Dialogue ID
@@ -831,5 +1142,6 @@ QuestionFrame:Hide()
 for index, QuestionButton in ipairs(QuestionButtons) do
     QuestionButton:Hide()
 end
+
 
 --END
