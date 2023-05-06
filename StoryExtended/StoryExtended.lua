@@ -326,19 +326,20 @@ function markQuestFinished(questId)
 end
 
 -- Save the original QuestRewardCompleteButton function into a variable for later use
-local originalQuestRewardCompleteButton_OnClick
-originalQuestRewardCompleteButton_OnClick = QuestRewardCompleteButton_OnClick
+if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    local originalQuestRewardCompleteButton_OnClick
+    originalQuestRewardCompleteButton_OnClick = QuestRewardCompleteButton_OnClick
 
 -- Overwritten Complete Quest btn function
-function customQuestRewardCompleteButton_OnClick() 
-	local rewardTitle = GetTitleText();                                             -- Get Quest Text from Title
-    local finishedQuestId = getCurrentQuestID(rewardTitle)                          -- Call function to get Quest ID
-    markQuestFinished(finishedQuestId)                                              -- Mark Quest ID as finished in SavedVariables
-    originalQuestRewardCompleteButton_OnClick()                                     -- Call original Quest Complete function
-end
+    function customQuestRewardCompleteButton_OnClick() 
+        local rewardTitle = GetTitleText();                                             -- Get Quest Text from Title
+        local finishedQuestId = getCurrentQuestID(rewardTitle)                          -- Call function to get Quest ID
+        markQuestFinished(finishedQuestId)                                              -- Mark Quest ID as finished in SavedVariables
+        originalQuestRewardCompleteButton_OnClick()                                     -- Call original Quest Complete function
+    end
 -- Overwrite Complete Quest button 
-QuestRewardCompleteButton_OnClick = customQuestRewardCompleteButton_OnClick
-
+    QuestRewardCompleteButton_OnClick = customQuestRewardCompleteButton_OnClick
+end
 -- If players want or have to set a quest to finished manually
 local function ManualQuestFinish(questID)
     if not StoryExtendedDB[99999] then
@@ -349,6 +350,7 @@ end
 ManualQuestFinish(4641)
 
 -- End of storing completed Quests for wow 1.12 workaround
+
 
 -- Create a list of all NPC with dialgue
 local function createNameList()
@@ -549,6 +551,258 @@ for i = 2, 4 do
     QuestionButtons[i]:SetPoint("TOPLEFT", QuestionButtons[i-1], "BOTTOMLEFT", 0, -10)
 end
 
+
+function customSetAnimation(model, animation)
+    if SetAnimation then
+        if animation == "Talk" then
+            animation = 60
+        end
+        model:SetAnimation(animation)
+    else
+        if animation == "Talk" then
+            model:SetSequence(4)
+        end
+    end
+end
+
+-- Talking Head frame creation
+--
+local talkingHead
+local model
+if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    talkingHead = CreateFrame("Frame", "MyTalkingHeadFrame", UIParent)
+    model = CreateFrame("DressUpModel", "MyTalkingHeadModel", talkingHead)
+else
+    talkingHead = CreateFrame("Frame", "MyTalkingHeadFrame", UIParent, "BackdropTemplate")
+    model = CreateFrame("PlayerModel", "MyTalkingHeadModel", talkingHead)
+end
+
+-- from https://github.com/mrthinger/wow-voiceover
+local modelToFileID = {
+    ["Original"] = {
+        ["interface/buttons/talktomequestion_white"]                = 130737,
+
+        ["character/bloodelf/female/bloodelffemale"]                = 116921,
+        ["character/bloodelf/male/bloodelfmale"]                    = 117170,
+        ["character/broken/female/brokenfemale"]                    = 117400,
+        ["character/broken/male/brokenmale"]                        = 117412,
+        ["character/draenei/female/draeneifemale"]                  = 117437,
+        ["character/draenei/male/draeneimale"]                      = 117721,
+        ["character/dwarf/female/dwarffemale"]                      = 118135,
+        ["character/dwarf/female/dwarffemale_hd"]                   = 950080,
+        ["character/dwarf/female/dwarffemale_npc"]                  = 950080,
+        ["character/dwarf/male/dwarfmale"]                          = 118355,
+        ["character/dwarf/male/dwarfmale_hd"]                       = 878772,
+        ["character/dwarf/male/dwarfmale_npc"]                      = 878772,
+        ["character/felorc/female/felorcfemale"]                    = 118652,
+        ["character/felorc/male/felorcmale"]                        = 118653,
+        ["character/felorc/male/felorcmaleaxe"]                     = 118654,
+        ["character/felorc/male/felorcmalesword"]                   = 118667,
+        ["character/foresttroll/male/foresttrollmale"]              = 118798,
+        ["character/gnome/female/gnomefemale"]                      = 119063,
+        ["character/gnome/female/gnomefemale_hd"]                   = 940356,
+        ["character/gnome/female/gnomefemale_npc"]                  = 940356,
+        ["character/gnome/male/gnomemale"]                          = 119159,
+        ["character/gnome/male/gnomemale_hd"]                       = 900914,
+        ["character/gnome/male/gnomemale_npc"]                      = 900914,
+        ["character/goblin/female/goblinfemale"]                    = 119369,
+        ["character/goblin/male/goblinmale"]                        = 119376,
+        ["character/goblinold/male/goblinoldmale"]                  = 119376,
+        ["character/human/female/humanfemale"]                      = 119563,
+        ["character/human/female/humanfemale_hd"]                   = 1000764,
+        ["character/human/female/humanfemale_npc"]                  = 1000764,
+        ["character/human/male/humanmale"]                          = 119940,
+        ["character/human/male/humanmale_cata"]                     = 119940,
+        ["character/human/male/humanmale_hd"]                       = 1011653,
+        ["character/human/male/humanmale_npc"]                      = 1011653,
+        ["character/icetroll/male/icetrollmale"]                    = 232863,
+        ["character/naga_/female/naga_female"]                      = 120263,
+        ["character/naga_/male/naga_male"]                          = 120294,
+        ["character/nightelf/female/nightelffemale"]                = 120590,
+        ["character/nightelf/female/nightelffemale_hd"]             = 921844,
+        ["character/nightelf/female/nightelffemale_npc"]            = 921844,
+        ["character/nightelf/male/nightelfmale"]                    = 120791,
+        ["character/nightelf/male/nightelfmale_hd"]                 = 974343,
+        ["character/nightelf/male/nightelfmale_npc"]                = 974343,
+        ["character/northrendskeleton/male/northrendskeletonmale"]  = 233367,
+        ["character/orc/female/orcfemale"]                          = 121087,
+        ["character/orc/female/orcfemale_npc"]                      = 121087,
+        ["character/orc/male/orcmale"]                              = {id = 121287, animLength = 1.900 },
+        ["character/orc/male/orcmale_hd"]                           = 917116,
+        ["character/orc/male/orcmale_npc"]                          = 917116,
+        ["character/scourge/female/scourgefemale"]                  = 121608,
+        ["character/scourge/female/scourgefemale_hd"]               = 997378,
+        ["character/scourge/female/scourgefemale_npc"]              = 997378,
+        ["character/scourge/male/scourgemale"]                      = 121768,
+        ["character/scourge/male/scourgemale_hd"]                   = 959310,
+        ["character/scourge/male/scourgemale_npc"]                  = 959310,
+        ["character/skeleton/male/skeletonmale"]                    = 121942,
+        ["character/taunka/male/taunkamale"]                        = 233878,
+        ["character/tauren/female/taurenfemale"]                    = 121961,
+        ["character/tauren/female/taurenfemale_hd"]                 = 986648,
+        ["character/tauren/female/taurenfemale_npc"]                = 986648,
+        ["character/tauren/male/taurenmale"]                        = 122055,
+        ["character/tauren/male/taurenmale_hd"]                     = 968705,
+        ["character/tauren/male/taurenmale_npc"]                    = 968705,
+        ["character/troll/female/trollfemale"]                      = 122414,
+        ["character/troll/female/trollfemale_hd"]                   = 1018060,
+        ["character/troll/female/trollfemale_npc"]                  = 1018060,
+        ["character/troll/male/trollmale"]                          = 122560,
+        ["character/troll/male/trollmale_hd"]                       = 1022938,
+        ["character/troll/male/trollmale_npc"]                      = 1022938,
+        ["character/tuskarr/male/tuskarrmale"]                      = 122738,
+        ["character/vrykul/male/vrykulmale"]                        = 122815,
+    },
+    ["HD"] = {
+        ["character/scourge/female/scourgefemale"]                  = 997378,
+    },
+}
+local function CleanupModelName(model)
+    model = string.lower(model)
+    model = string.gsub(model, "\\", "/")
+    model = string.gsub(model, "%.m2", "")
+    model = string.gsub(model, "%.mdx", "")
+    return model
+end
+
+
+local function HasModelLoaded(modelCheck)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        local model = modelCheck:GetModel()
+        return model and type(model) == "string" and GetModelFileID() ~= 130737
+    else
+        return model:GetModelFileID() ~= 130737
+    end 
+end
+
+if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    function GetModelFileID()
+        local model = model:GetModel()
+        if model and type(model) == "string" then
+            model = CleanupModelName(model)
+            local models = modelToFileID["Original"]
+            return models[model].id or modelToFileID["Original"][model].id
+        end
+    end
+end
+
+-- local sequenceID = 60
+
+-- local animTimer = 0
+-- local setSizeModelDone = false
+-- local animLoopCount =  0
+
+
+
+
+
+function playAnimation(sequenceID, animLoops)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        local sequenceDuration = 2000
+        local animTimer = 0
+        local animLoopCount =  0
+        local function OnUpdate(frame, elapsed)
+            -- if HasModelLoaded(model) and setSizeModelDone == false then
+            --     model:SetModelScale(4)
+            --     model:SetPosition(0, 0, -2.8)
+            --     setSizeModelDone = true
+            --    -- talkingHead:SetScript("OnUpdate", nil)
+            -- end
+            animTimer = animTimer + (arg1*1000)
+            model:SetSequenceTime(sequenceID, animTimer)
+            if animTimer > sequenceDuration then
+                animLoopCount = animLoopCount + 1
+                if animLoopCount >= animLoops then
+                    setSizeModelDone = false
+                    animTimer = 0
+                    animLoopCount =  0
+                    model:SetScript("OnUpdate", nil)
+                else
+                    animTimer = 0
+                end
+            end
+        end
+        model:SetScript("OnUpdate", OnUpdate)
+    else
+        local sequenceDuration = 2000
+        local animTimer = sequenceDuration
+        local animLoopCount = 0
+        local function OnUpdate(frame, elapsed)
+            if animLoopCount <= animLoops then
+                if (GetTime() - animTimer)*1000 >= sequenceDuration then
+                    animTimer = GetTime()
+                    model:SetAnimation(60)
+                    animLoopCount = animLoopCount + 1
+                end
+            else
+                model:SetAnimation(0)
+                model:SetScript("OnUpdate", nil)
+            end
+        end
+        model:SetScript("OnUpdate", OnUpdate)
+    end
+end
+
+
+
+local function createTalkingHead()
+    -- Create the frame
+    talkingHead:SetWidth(128)
+    talkingHead:SetHeight(128)
+    talkingHead:SetPoint("BOTTOM", UIParent, "BOTTOM", -360, 110)
+
+    -- Set the backdrop and border of the frame
+    talkingHead:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 0.5, right = 0.5, top = 0.5, bottom = 0.5 }
+    })
+    
+    talkingHead:SetBackdropBorderColor(1, 1, 1)
+    talkingHead:SetBackdropColor(0, 0, 0, 0.5)
+
+        -- Create the model
+        model:SetPoint("CENTER", talkingHead, "CENTER")
+        model:SetWidth(120)
+        model:SetHeight(120)
+    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        model:SetUnit("target")
+        model:SetModelScale(1.25)
+        model:SetPosition(0, 0, 2)
+        model:SetRotation(math.rad(10))
+
+
+        local function OnUpdate(frame, elapsed)
+            if HasModelLoaded(model) then
+                model:SetModelScale(4)
+                model:SetPosition(0, 0, -2.8)
+                talkingHead:SetScript("OnUpdate", nil)
+            end
+        end
+        -- Set the OnUpdate script
+        talkingHead:SetScript("OnUpdate", OnUpdate)
+    else
+        model:SetUnit("target")
+        model:SetPortraitZoom(1.0)
+        model:SetPosition(0, 0, 0)
+        -- model:SetLight(1, 0, 0, -- diffuse color
+        --        0, 1, 0, -- ambient color
+        --        0, 0, 1, -- specular color
+        --        0, 0, 0, -- attenuation distances
+        --        0, 0, 0, -- light position
+        --        0, 0)    -- light falloff
+    end
+    -- Show the frame
+    talkingHead:Show()
+end
+
+--createTalkingHead()
+
+
+
+
+-- Call the createNameList Function
 createNameList()
 -- Add texture to name plate of NPC if they have dialogue
 
@@ -698,7 +952,6 @@ end)
 
 -- END
 
--- Couple of functions ahead
 
 local currentSoundHandle
 -- Function to start playing dialogue sound files
@@ -726,16 +979,6 @@ function StopDialogue(CurrentDialogue)
    -- currentSoundHandle = nil
 end
 
--- local function IsQuestCompleted(questId)
---     local completedQuests = C_QuestLog.GetCompletedQuests()
---     for i, completedQuestId in ipairs(completedQuests) do
---         if completedQuestId == questId then
---             return true
---         end
---     end
---     return false
--- end
-
 -- Function to set the QuestionFrame Size depending on how many questions  the dialogue has
 local function QuestionButtonHider(QuestionCounter)
     local QuestionFrameHeights = {50, 100, 150, 200}
@@ -753,7 +996,7 @@ local function StartConditionCheck(targetName, conditionType, conditionValue)
     elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "quest-id" and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then
         return true
     -- If the client version is 1.12 or something similar dont use C_QuestLog
-    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "quest-id" and StoryExtendedDB[99999][(tonumber(conditionValue))] == true) then
+    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "quest-id" and StoryExtendedDB[99999] and StoryExtendedDB[99999][(tonumber(conditionValue))] == true) then
         return true
     -- For new WoW
     elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "doFirst") then
@@ -792,6 +1035,7 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
     -- Do we have a valid NPC loaded? If not, then stop the function and hide the dialogue interface
     if CurrentDialogue == nil then
         DialogueFrame:Hide()
+        talkingHead:Hide()
         for index, QuestionButton in ipairs(QuestionButtons) do
             QuestionButton:Hide()
         end
@@ -801,6 +1045,9 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
     end
     local npcID = hashString(CurrentDialogue.Name)    
     -- if the npcID subtable does not exist yet, create it
+    if not StoryExtendedDB then
+        StoryExtendedDB = {}
+    end
     if not StoryExtendedDB[npcID] then
         StoryExtendedDB[npcID] = {}
     end
@@ -810,20 +1057,17 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
 
 
         --testing
-        for npcID, subTable in pairs(StoryExtendedDB) do
-            for npcIndexID, nestedTable in pairs(subTable) do
-                if type(nestedTable) == "table" then
-                    for key, value in pairs(nestedTable) do
-                        if key == "Name" then
-                            DEFAULT_CHAT_FRAME:AddMessage("npcID: " .. npcID .. ", npcIndexID: " .. npcIndexID .. ", " .. key .. ": " .. value)
-                        end
-                    end
-                end
-            end
-        end
-
-
-
+        -- for npcID, subTable in pairs(StoryExtendedDB) do
+        --     for npcIndexID, nestedTable in pairs(subTable) do
+        --         if type(nestedTable) == "table" then
+        --             for key, value in pairs(nestedTable) do
+        --                 if key == "Name" then
+        --                     DEFAULT_CHAT_FRAME:AddMessage("npcID: " .. npcID .. ", npcIndexID: " .. npcIndexID .. ", " .. key .. ": " .. value)
+        --                 end
+        --             end
+        --         end
+        --     end
+        -- end
 
 
     end  
@@ -832,11 +1076,15 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
         if StoryExtendedDB[npcID][npcIndexID].didOnce1 == "true" then
             DialogueFrame:Hide()
             QuestionFrame:Hide()
+            talkingHead:Hide()
             ShowUI()
             return
         end
     end
-    DialogueText:SetText(CurrentDialogue.Text)        
+
+    local animLoops = math.ceil(string.len(CurrentDialogue.Text) / 40)
+    DialogueText:SetText(CurrentDialogue.Text)
+    playAnimation(60,animLoops)                                                   -- play the anim (only talk supported atm), second input is the loop counter
     if CurrentDialogue.UseAudio == "true" then
         PlayDialogue(CurrentDialogue, DatabaseName)
     end
@@ -899,6 +1147,7 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName)
 
                 -- Activate the On Button Click functionality and set it up
                 QuestionButtons[i]:SetScript("OnClick", function()
+                    model:SetSequence(60)
                     -- Set the SavedVariables dialogue ID to AlreadySeen (so we can check if it has been seen and should be seen again)
                     StoryExtendedDB[npcID][npcIndexID][AlreadySeen] = StoryExtendedDB[npcID][npcIndexID][AlreadySeen] or true
                     StoryExtendedDB[npcID][npcIndexID][AlreadySeenAll] = StoryExtendedDB[npcID][npcIndexID][AlreadySeenAll] or true
@@ -972,6 +1221,7 @@ function UpdateDialogue(Dialogue, NextID, dialogueEnds, DatabaseName)
             QuestionButton:Hide()
         end
         QuestionFrame:Hide()
+        talkingHead:Hide()
         ShowUI()
         CurrentID = StoryExtendedDB[npcID][targetName]
         dialogueEnds = false
@@ -1046,7 +1296,6 @@ end
 
 -- Create a button to trigger the conversation
 local function TalkStoryFunc(zone_input)
-    getCurrentQuests()
     local targetName
     local isZone = false
     if zone_input ~= nil then
@@ -1077,6 +1326,7 @@ local function TalkStoryFunc(zone_input)
         if not isZone then
             local isInRange = CheckInteractDistance("target", 3)
             if isInRange then
+                createTalkingHead()
                 DialogueFrame:Show()
                 QuestionFrame:Show()
                 -- Hide all UI elements but the dialogue UI, if the option is activated
@@ -1094,6 +1344,7 @@ local function TalkStoryFunc(zone_input)
             HideUI()
             DialogueFrame:Show()
             QuestionFrame:Show()
+            createTalkingHead()
             UpdateFrame(CurrentDialogue, targetName, DatabaseName)
 
         end
@@ -1139,6 +1390,9 @@ end
 --DialogueFrame:SetScript("OnMouseDown", function() DialogueFrame:StopMovingOrSizing() end)
 DialogueFrame:Hide()
 QuestionFrame:Hide()
+if talkingHead then
+    talkingHead:Hide()
+end
 for index, QuestionButton in ipairs(QuestionButtons) do
     QuestionButton:Hide()
 end
