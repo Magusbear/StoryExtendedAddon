@@ -117,7 +117,7 @@ StoryExtendedMinimapIcon = LibStub("LibDBIcon-1.0")
 end
 
 function SE_ToggleMinimapBtn()
-    if StoryExtended.db.profile.minimap.hide then
+    if StoryExtended.db.profile.minimap and StoryExtended.db.profile.minimap.hide then
         StoryExtendedMinimapIcon:Hide("StoryExtendedMMBtn")
     else
         StoryExtendedMinimapIcon:Show("StoryExtendedMMBtn")
@@ -131,7 +131,8 @@ function StoryExtended:OnEnable()
         local AceConfigDialog = LibStub("AceConfigDialog-3.0")
         local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
-        local defaults = {                                                                  -- the Default values for the options menu
+
+        local defaults = {                                                              -- the Default values for the options menu
         profile = {
             HideUIOption = false,                                                       -- Hide the UI when starting a dialogue
             lockDialogueFrames = true,                                                  -- prevent dialogue frames from being dragged
@@ -142,12 +143,18 @@ function StoryExtended:OnEnable()
             --hide = false.
         },
         }
+
+
         StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)           -- Register the options DB
-       -- StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", { profile = { minimap = { hide = false, }, }, })
-        -- Ace3 Options menu for New WoW
-        local options = {                                                                                   -- Atm everything is in the main menu page
-            name = "StoryExtended",                                                                         -- there is no formatting, just a list of toggles
-            handler = StoryExtended,                                                                        -- should be made prettier at some point I guess
+        StoryExtendedMinimapIcon:Register("StoryExtendedMMBtn", StoryExtendedLDB, StoryExtended.db.profile.minimap)
+
+        local profile = StoryExtended.db.profile                                        -- get profile
+        profile.minimap = { hide = false }                                              -- have to add the minimap variable to the profile table
+
+        -- Ace3 Options menu
+        local options = {                                                               
+            name = "StoryExtended",
+            handler = StoryExtended,
             type = 'group',
             args = {
                 profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db),
@@ -223,25 +230,15 @@ function StoryExtended:OnEnable()
                 },
             }
         }
-        -- -- Register the main options menu
-        StoryExtended:RegisterOptionsTable("StoryExtended_options", options)
+        StoryExtended:RegisterOptionsTable("StoryExtended_options", options)                                        -- Register the main options menu
         StoryExtended.optionsFrame = AceConfigDialog:AddToBlizOptions("StoryExtended_options", "StoryExtended")
+        SLASH_StoryExtended1 = "/storyextended"                                                                     -- Create a slash command 
+        SlashCmdList["StoryExtended"] = function() InterfaceOptionsFrame_OpenToCategory("StoryExtended") end        -- to open the options panel
 
-        StoryExtendedMinimapIcon:Register("StoryExtendedMMBtn", StoryExtendedLDB, StoryExtended.db.profile.minimap)
-        -- -- Register the profile tab in the options menu
-        --local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)           -- Gets optionstable DB
-       -- StoryExtended:RegisterOptionsTable("StoryExtended_Profiles", profile)
-
-        --StoryExtended:RegisterOptionsTable("StoryExtended_Profiles", options.args.profiles)
-
-        -- AceConfigDialog:AddToBlizOptions("StoryExtended_Profiles", "Profiles", "StoryExtended")
-
-        -- Create a slash command to open the options panel
-        SLASH_StoryExtended1 = "/storyextended"
-        SlashCmdList["StoryExtended"] = function() InterfaceOptionsFrame_OpenToCategory("StoryExtended") end
-
-        StoryExtended:RegisterChatCommand("se", "SlashCommand")                                 -- Slash command /se
-        --StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")                      -- Slash command /storyextended     both start a dialogue with target
+        StoryExtended:RegisterChatCommand("se", "SlashCommand")                                                     -- Slash command /se
+                                                                                                                    -- Slash command /storyextended     
+                                                                                                                    -- /se talk starts dialogue
+                                                                                                                    -- /se settings opens settings
         -- Getting the SavedVariables from our Options DB and setting them -> load options basically
         HideUIOption = StoryExtended.db.profile.HideUIOption
         lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
@@ -249,8 +246,8 @@ function StoryExtended:OnEnable()
         playVoices = StoryExtended.db.profile.playNpcVoiceOver
         showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
         animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+        SE_ToggleMinimapBtn()                                                                                       -- toggle minimap button
 
-        SE_ToggleMinimapBtn()
     -- New WoW Code
     else
         local defaults = {                                                                  -- the Default values for the options menu
@@ -491,7 +488,7 @@ frame:SetScript("OnEvent", StoryExtended_OnEvent)
 -- Function for getting Quest ID
 local function getCurrentQuestID(questName)
 local foundQuestID = 0
-for id, loc in pairs(pfDB["quests"]["enUS"]) do                                     -- Searching the pfDB for the completed quest name
+for id, loc in pairs(custompfDB["quests"]["enUS"]) do                                     -- Searching the pfDB for the completed quest name
     locText = loc["T"]                                                              -- "T" is the Title of the quest which I check against the input quest name
     if locText == questName then
         foundQuestID = id                                                           -- the keys of this table are the id's
