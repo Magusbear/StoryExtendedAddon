@@ -1,4 +1,12 @@
-StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0", "AceTimer-3.0")
+setfenv(1, StoryExtendedEnv)
+local CLIENT_VERSION, BUILD = GetBuildInfo()
+
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    print("test")
+    StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0", "AceTimer-3.0", "AceConfig-3.0")
+else
+    StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0")
+end
 
 StoryExtendedDB = {}                                                            -- The save variable which is written into SavedVariables
 CurrentID = 1                                                                   -- the current dialogue ID (the ID for which text is shown currently)
@@ -18,17 +26,12 @@ local playVoices = true                                                         
 local showNpcPortrait = true                                                    -- Option: Show NPC Portraits
 local animateNpcPortrait = true                                                 -- Option: animate the NPC Portraits
 local currentSoundHandle                                                        -- holds a reference of the playing dialogue audio (New WoW only)
+local DialogueChoiceFontSize = 14                                               -- Text size of the dialogue choices
+local StoryExtendedMinimapIcon
+local StoryExtendedLDB
+local showMinimapBtn = true
 
--- Helper Functions shamelefully "borrowed" from AI_VoiceOver by MrThinger, will ask for permission and forgiveness later!
-if not print then
-    function print(...)
-        local text = ""
-        for i = 1, arg.n do
-            text = text .. (i > 1 and " " or "") .. tostring(arg[i])
-        end
-        DEFAULT_CHAT_FRAME:AddMessage(text)
-    end
-end
+-- Helper Functions from AI_VoiceOver by MrThinger
 
 if not select then
     function select(index, ...)
@@ -43,12 +46,20 @@ if not select then
         end
     end
 end
--- ^^^ Helper Functions shamelefully "borrowed" from AI_VoiceOver by MrThinger, will ask for permission and forgiveness later!
 
-local CLIENT_VERSION, BUILD = GetBuildInfo()
+if not string.match then
+    local function getargs(s, e, ...)
+        return unpack(arg)
+    end
+    function string.match(str, pattern)
+        return getargs(string.find(str, pattern))
+    end
+end
+-- ^^^ Helper Functions from AI_VoiceOver by MrThinger
+
+
 local AceTimer
--- print(CLIENT_VERSION)
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     -- Client version is 1.12 or below
 else
     -- Client version is higher than 1.12
@@ -68,7 +79,6 @@ dialogueDataAddons =
 function StoryExtended:Register(name, dataAddon)
     assert(not dialogueDataAddons.registeredDataAddons[name], format([[Data addon "%s" already registered]], name))     -- Check if the addon is already registered
     dialogueDataAddons.registeredDataAddons[name] = dataAddon                                                           -- Add the data addon data to the array under its name
-    --dataAddonVersion = GetAddOnMetadata(name, "Version")
 end
 
 
@@ -79,91 +89,249 @@ LoadAddOn("StoryExtended")
 
 -- Ace3 functions Begin
 
-local defaults = {                                                                  -- the Default values for the options menu
-	profile = {
-		HideUIOption = false,                                                       -- Hide the UI when starting a dialogue
-        lockDialogueFrames = true,                                                  -- prevent dialogue frames from being dragged
-        playNpcVoiceOver = true,                                                    -- play audio voice overs
-        showNpcPortraitOption = true,                                               -- show a 3D portrait of NPC
-        animateNpcPortraitOption = true,                                            -- Play emotes with the 3D portrait
-	},
-}
 
--- Ace3 Options menu for New WoW
-local options = {                                                                                   -- Atm everything is in the main menu page
-    name = "StoryExtended",                                                                         -- there is no formatting, just a list of toggles
-    handler = StoryExtended,                                                                        -- should be made prettier at some point I guess
-    type = 'group',
-    args = {
-        HideUIOption = {
-            type = 'toggle',
-            name = 'Hide UI',
-            desc = 'Hide the Interface when starting a Dialogue.',
-            set = function (info, value)
-                StoryExtended.db.profile.HideUIOption = value
-                HideUIOption = StoryExtended.db.profile.HideUIOption
-            end,
-            get = function (info) return StoryExtended.db.profile.HideUIOption end,
-        },
-        LockDialogueFrames = {
-            type = 'toggle',
-            name = 'Lock Frames',
-            desc = 'Lock the dialogue frames.',
-            set = function (info, value)
-                StoryExtended.db.profile.lockDialogueFrames = value
-                lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
-                letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
-                DialogueFrame:SetMovable(letMoveFrames)
-                QuestionFrame:SetMovable(letMoveFrames)
-                DialogueFrame:EnableMouse(letMoveFrames)
-                QuestionFrame:EnableMouse(letMoveFrames)
-            end,
-            get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
-        },
-        playNpcVoiceOver = {
-            type = 'toggle',
-            name = 'Play Voice Over',
-            desc = 'Play sound voice overs for NPC.',
-            set = function (info, value)
-                StoryExtended.db.profile.playNpcVoiceOver = value
-                playVoices = StoryExtended.db.profile.playNpcVoiceOver
-            end,
-            get = function (info) return StoryExtended.db.profile.playNpcVoiceOver end,
-        },
-        showNpcPortraitOption = {
-            type = 'toggle',
-            name = 'Show NPC Portrait',
-            desc = 'Shows a 3D NPC Portrait during Dialogue.',
-            set = function (info, value)
-                StoryExtended.db.profile.showNpcPortraitOption = value
-                showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
-            end,
-            get = function (info) return StoryExtended.db.profile.showNpcPortraitOption end,
-        },
-        animateNpcPortraitOption = {
-            type = 'toggle',
-            name = 'Animate NPC Portrait',
-            desc = 'Animates the 3D NPC Portrait with emotes.',
-            set = function (info, value)
-                StoryExtended.db.profile.animateNpcPortraitOption = value
-                animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
-            end,
-            get = function (info) return StoryExtended.db.profile.animateNpcPortraitOption end,
-        },
-    }
-}
 --END Ace3 Options menu for New WoW
 
 -- Ace3 function for when Addon is initialized. Fired too early for my uses. The SavedVariables aren't loaded yet when this fires
 function StoryExtended:OnInitialize()
+-- Create the minimap button
+    StoryExtendedLDB = LibStub("LibDataBroker-1.1"):NewDataObject("StoryExtendedMMBtn", {
+    type = "data source",
+    text = "StoryExtended",
+    icon = "Interface\\Icons\\INV_Misc_Gear_01",
+    OnClick = function(self, button)
+        InterfaceOptionsFrame_OpenToCategory("StoryExtended")
+    end,
+    OnEnter = function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("StoryExtended")
+        GameTooltip:AddLine("Leftclick to open Settings.", 1, 1, 1)
+        GameTooltip:AddLine("Drag to move.", 1, 1, 1)
+        GameTooltip:Show()
+    end,
+    OnLeave = function(self)
+        GameTooltip:Hide()
+    end,
+})
+StoryExtendedMinimapIcon = LibStub("LibDBIcon-1.0")
+end
 
+function SE_ToggleMinimapBtn()
+    if StoryExtended.db.profile.minimap.hide then
+        StoryExtendedMinimapIcon:Hide("StoryExtendedMMBtn")
+    else
+        StoryExtendedMinimapIcon:Show("StoryExtendedMMBtn")
+    end
 end
 
 -- Ace3 function for when Addon is enabled
 function StoryExtended:OnEnable()
-    -- New WoW code         -- I'm not sure if ace3 options menu works in WoW 1.12 or how to set it up there
-    if string.sub(CLIENT_VERSION, 1, 1) ~= "1" then
+    -- WoW 1.12 Code
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+        local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+        local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
+
+        local defaults = {                                                                  -- the Default values for the options menu
+        profile = {
+            HideUIOption = false,                                                       -- Hide the UI when starting a dialogue
+            lockDialogueFrames = true,                                                  -- prevent dialogue frames from being dragged
+            playNpcVoiceOver = true,                                                    -- play audio voice overs
+            showNpcPortraitOption = true,                                               -- show a 3D portrait of NPC
+            animateNpcPortraitOption = true,                                            -- Play emotes with the 3D portrait
+            toggleMiniMap = false,
+            --hide = false.
+        },
+        }
         StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)           -- Register the options DB
+       -- StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", { profile = { minimap = { hide = false, }, }, })
+        -- Ace3 Options menu for New WoW
+        local options = {                                                                                   -- Atm everything is in the main menu page
+            name = "StoryExtended",                                                                         -- there is no formatting, just a list of toggles
+            handler = StoryExtended,                                                                        -- should be made prettier at some point I guess
+            type = 'group',
+            args = {
+                profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db),
+                HideUIOption = {
+                    type = 'toggle',
+                    name = 'Hide UI',
+                    desc = 'Hide the Interface when starting a Dialogue.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.HideUIOption = value
+                        HideUIOption = StoryExtended.db.profile.HideUIOption
+                    end,
+                    get = function (info) return StoryExtended.db.profile.HideUIOption end,
+                },
+                LockDialogueFrames = {
+                    type = 'toggle',
+                    name = 'Lock Frames',
+                    desc = 'Lock the dialogue frames.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.lockDialogueFrames = value
+                        lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+                        letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+                        DialogueFrame:SetMovable(letMoveFrames)
+                        QuestionFrame:SetMovable(letMoveFrames)
+                        DialogueFrame:EnableMouse(letMoveFrames)
+                        QuestionFrame:EnableMouse(letMoveFrames)
+                    end,
+                    get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
+                },
+                playNpcVoiceOver = {
+                    type = 'toggle',
+                    name = 'Play Voice Over',
+                    desc = 'Play sound voice overs for NPC.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.playNpcVoiceOver = value
+                        playVoices = StoryExtended.db.profile.playNpcVoiceOver
+                    end,
+                    get = function (info) return StoryExtended.db.profile.playNpcVoiceOver end,
+                },
+                showNpcPortraitOption = {
+                    type = 'toggle',
+                    name = 'Show NPC Portrait',
+                    desc = 'Shows a 3D NPC Portrait during Dialogue.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.showNpcPortraitOption = value
+                        showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
+                    end,
+                    get = function (info) return StoryExtended.db.profile.showNpcPortraitOption end,
+                },
+                animateNpcPortraitOption = {
+                    type = 'toggle',
+                    name = 'Animate NPC Portrait',
+                    desc = 'Animates the 3D NPC Portrait with emotes.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.animateNpcPortraitOption = value
+                        animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+                    end,
+                    get = function (info) return StoryExtended.db.profile.animateNpcPortraitOption end,
+                },
+                toggleMiniMap = {
+                    type = 'toggle',
+                    name = 'Hide Minimap Button',
+                    desc = 'Hide or show the minimap button.',
+                    set = function (info, value)
+                        StoryExtended.db.profile.minimap.hide = value
+                        showMinimapBtn = StoryExtended.db.profile.minimap.hide
+                        if StoryExtended.db.profile.minimap.hide then
+                            StoryExtendedMinimapIcon:Hide("StoryExtendedMMBtn")
+                        else
+                            StoryExtendedMinimapIcon:Show("StoryExtendedMMBtn")
+                        end
+                    end,
+                    get = function (info) return StoryExtended.db.profile.minimap.hide end,
+                },
+            }
+        }
+        -- -- Register the main options menu
+        StoryExtended:RegisterOptionsTable("StoryExtended_options", options)
+        StoryExtended.optionsFrame = AceConfigDialog:AddToBlizOptions("StoryExtended_options", "StoryExtended")
+
+        StoryExtendedMinimapIcon:Register("StoryExtendedMMBtn", StoryExtendedLDB, StoryExtended.db.profile.minimap)
+        -- -- Register the profile tab in the options menu
+        --local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)           -- Gets optionstable DB
+       -- StoryExtended:RegisterOptionsTable("StoryExtended_Profiles", profile)
+
+        --StoryExtended:RegisterOptionsTable("StoryExtended_Profiles", options.args.profiles)
+
+        -- AceConfigDialog:AddToBlizOptions("StoryExtended_Profiles", "Profiles", "StoryExtended")
+
+        -- Create a slash command to open the options panel
+        SLASH_StoryExtended1 = "/storyextended"
+        SlashCmdList["StoryExtended"] = function() InterfaceOptionsFrame_OpenToCategory("StoryExtended") end
+
+        StoryExtended:RegisterChatCommand("se", "SlashCommand")                                 -- Slash command /se
+        --StoryExtended:RegisterChatCommand("storyextended", "SlashCommand")                      -- Slash command /storyextended     both start a dialogue with target
+        -- Getting the SavedVariables from our Options DB and setting them -> load options basically
+        HideUIOption = StoryExtended.db.profile.HideUIOption
+        lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+        letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+        playVoices = StoryExtended.db.profile.playNpcVoiceOver
+        showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
+        animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+
+        SE_ToggleMinimapBtn()
+    -- New WoW Code
+    else
+        local defaults = {                                                                  -- the Default values for the options menu
+        profile = {
+            HideUIOption = false,                                                       -- Hide the UI when starting a dialogue
+            lockDialogueFrames = true,                                                  -- prevent dialogue frames from being dragged
+            playNpcVoiceOver = true,                                                    -- play audio voice overs
+            showNpcPortraitOption = true,                                               -- show a 3D portrait of NPC
+            animateNpcPortraitOption = true,                                            -- Play emotes with the 3D portrait
+            toggleMiniMap = false,
+            --hide = false.
+        },
+        }
+
+        StoryExtended.db = LibStub("AceDB-3.0"):New("GlobalStoryExtendedDB", defaults, false)           -- Register the options DB
+
+        local options = {                                                                                   -- Atm everything is in the main menu page
+        name = "StoryExtended",                                                                         -- there is no formatting, just a list of toggles
+        handler = StoryExtended,                                                                        -- should be made prettier at some point I guess
+        type = 'group',
+        args = {
+            profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db),
+            HideUIOption = {
+                type = 'toggle',
+                name = 'Hide UI',
+                desc = 'Hide the Interface when starting a Dialogue.',
+                set = function (info, value)
+                    StoryExtended.db.profile.HideUIOption = value
+                    HideUIOption = StoryExtended.db.profile.HideUIOption
+                end,
+                get = function (info) return StoryExtended.db.profile.HideUIOption end,
+            },
+            LockDialogueFrames = {
+                type = 'toggle',
+                name = 'Lock Frames',
+                desc = 'Lock the dialogue frames.',
+                set = function (info, value)
+                    StoryExtended.db.profile.lockDialogueFrames = value
+                    lockDialogueFrames = StoryExtended.db.profile.lockDialogueFrames
+                    letMoveFrames = not lockDialogueFrames and not lockedFramesHelper
+                    DialogueFrame:SetMovable(letMoveFrames)
+                    QuestionFrame:SetMovable(letMoveFrames)
+                    DialogueFrame:EnableMouse(letMoveFrames)
+                    QuestionFrame:EnableMouse(letMoveFrames)
+                end,
+                get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
+            },
+            playNpcVoiceOver = {
+                type = 'toggle',
+                name = 'Play Voice Over',
+                desc = 'Play sound voice overs for NPC.',
+                set = function (info, value)
+                    StoryExtended.db.profile.playNpcVoiceOver = value
+                    playVoices = StoryExtended.db.profile.playNpcVoiceOver
+                end,
+                get = function (info) return StoryExtended.db.profile.playNpcVoiceOver end,
+            },
+            showNpcPortraitOption = {
+                type = 'toggle',
+                name = 'Show NPC Portrait',
+                desc = 'Shows a 3D NPC Portrait during Dialogue.',
+                set = function (info, value)
+                    StoryExtended.db.profile.showNpcPortraitOption = value
+                    showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
+                end,
+                get = function (info) return StoryExtended.db.profile.showNpcPortraitOption end,
+            },
+            animateNpcPortraitOption = {
+                type = 'toggle',
+                name = 'Animate NPC Portrait',
+                desc = 'Animates the 3D NPC Portrait with emotes.',
+                set = function (info, value)
+                    StoryExtended.db.profile.animateNpcPortraitOption = value
+                    animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+                end,
+                get = function (info) return StoryExtended.db.profile.animateNpcPortraitOption end,
+            },
+        }
+    }
+
+
         -- Register the main options menu
         LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_options", options)
         StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_options", "StoryExtended")
@@ -283,7 +451,7 @@ end
 -- Function that saves data into SavedVariables
 local function StoryExtended_OnEvent(self, event, addonName)
     -- wow 1.12 code. 1.12 seems to save a tad bit differently into SavedVariables
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         if event == "ADDON_LOADED" and addonName == "StoryExtended" then
             if not StoryExtendedDB then
                 StoryExtendedDB = {}
@@ -334,7 +502,7 @@ end
 
 -- Mark the quest as finished in the SavedVariables
 function markQuestFinished(questId)
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         if not StoryExtendedDB[99999] then                                          -- The table keys are numericals so I chose a high number for the QuestList
             StoryExtendedDB[99999] = {}                                             -- Create the table if it doesn't exist
         end
@@ -343,7 +511,7 @@ function markQuestFinished(questId)
 end
 
 -- Save the original QuestRewardCompleteButton function into a variable for later use
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     local originalQuestRewardCompleteButton_OnClick
     originalQuestRewardCompleteButton_OnClick = QuestRewardCompleteButton_OnClick
 
@@ -372,7 +540,7 @@ ManualQuestFinish(4641)
 -- Create a list of all NPC with dialgue
 local function createNameList()
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         for _, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do               -- Goes through each data addon dialogue DB...
             local dialogueData = dataAddon.GetDialogue                                      -- looks for the namefield and checks if that name...
             local checkDialogues = dialogueData                                             -- is already present in the nameList
@@ -405,7 +573,7 @@ end
 local DialogueFrame                                                                 -- declared outside of if function
 
 -- WoW 1.12 code
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent)
 -- New WoW Code (only difference is the use of "BackdropTemplate" in New WoW)
 else
@@ -446,7 +614,7 @@ DialogueText:SetFont(DialogueText:GetFont(), 20)
 -- Create a question frame for the dialogue questions
 local QuestionFrame                                                                 -- declared outside of if function
 -- WoW 1.12 Code
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent)
 -- New WoW Code (only difference is the use of "BackdropTemplate" in New WoW)
 else
@@ -504,14 +672,14 @@ QuestionText:SetFont(QuestionText:GetFont(), 20)
 local QuestionButtons = {}                                                          -- these are the player dialogue choices
 for i = 1, 4 do
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         local QuestionButton = CreateFrame("Button", "QuestionButton"..i, UIParent)
         QuestionButton:SetWidth(QuestionFrame:GetWidth() * 0.93)
         QuestionButton:SetHeight(QuestionFrame:GetHeight() * 0.75 / 4)
 
         QuestionButton:SetText(" ")
         QuestionButton:SetFrameStrata("HIGH")
-        QuestionButton:SetFont("Fonts\\FRIZQT__.TTF", 14)
+        QuestionButton:SetFont("Fonts\\FRIZQT__.TTF", DialogueChoiceFontSize)
         QuestionButton:SetHighlightFontObject("GameFontHighlightLarge")
         QuestionButton:SetBackdrop({
             bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -521,9 +689,9 @@ for i = 1, 4 do
         })
         QuestionButton:SetBackdropColor(0, 0, 0, 1)
         QuestionButton:SetBackdropBorderColor(1, 1, 1, 1)
-        local text = QuestionButton:GetFontString()
-        text:SetPoint("CENTER", QuestionButton, "CENTER")
-        text:SetTextColor(1, 1, 1)
+        local DialogueChoiceText = QuestionButton:GetFontString()
+        DialogueChoiceText:SetPoint("CENTER", QuestionButton, "CENTER")
+        DialogueChoiceText:SetTextColor(1, 1, 1)
         QuestionButtons[i] = QuestionButton
         tinsert(UISpecialFrames, "QuestionButton"..i)
     -- New WoW Code     -- Lots of repetitions but leaving it as is for now for readability
@@ -560,7 +728,7 @@ end
 local talkingHead                                                                           -- have to declare outside of the if statement
 local model                                                                                 -- have to declare outside of the if statement
 -- WoW 1.12 code
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     talkingHead = CreateFrame("Frame", "SETalkingHeadFrame", UIParent)                      -- WoW 1.12 hasnt got a "BackdropTemplate"
     model = CreateFrame("DressUpModel", "SETalkingHeadModel", talkingHead)                  -- DressUpModel is a special frame that can hold a 3D model
 -- New WoW Code
@@ -570,103 +738,106 @@ else
 end
 tinsert(UISpecialFrames, "SETalkingHeadFrame")                                              -- Close with ESC key
 
--- from https://github.com/mrthinger/wow-voiceover, added the animLength                    -- A lookup table for the model IDs and talk animation lengths
-local modelToFileID = {                                                                     -- If anims other than "talk" are used they would have to be...
-    ["Original"] = {                                                                        -- added to this list with their corresponding length
-                                                                                            -- Anim [60]: Talk emote
-                                                                                            -- Anim [1]: Dance emote
-                                                                                            -- to add new animation use ",[animID] = lengthOfAnim," for each model
-        ["interface/buttons/talktomequestion_white"]                = {id = 130737, animId = { [60] = 0, [1] = 0 },},
-        ["character/bloodelf/female/bloodelffemale"]                = {id = 116921, animId = { [60] = 0, [1] = 0 },},
-        ["character/bloodelf/male/bloodelfmale"]                    = {id = 117170, animId = { [60] = 0, [1] = 0 },},
-        ["character/broken/female/brokenfemale"]                    = {id = 117400, animId = { [60] = 0, [1] = 0 },},
-        ["character/broken/male/brokenmale"]                        = {id = 117412, animId = { [60] = 0, [1] = 0 },},
-        ["character/draenei/female/draeneifemale"]                  = {id = 117437, animId = { [60] = 0, [1] = 0 },},
-        ["character/draenei/male/draeneimale"]                      = {id = 117721, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/female/dwarffemale"]                      = {id = 118135, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/female/dwarffemale_hd"]                   = {id = 950080, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/female/dwarffemale_npc"]                  = {id = 950080, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/male/dwarfmale"]                          = {id = 118355, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/male/dwarfmale_hd"]                       = {id = 878772, animId = { [60] = 0, [1] = 0 },},
-        ["character/dwarf/male/dwarfmale_npc"]                      = {id = 878772, animId = { [60] = 0, [1] = 0 },},
-        ["character/felorc/female/felorcfemale"]                    = {id = 118652, animId = { [60] = 0, [1] = 0 },},
-        ["character/felorc/male/felorcmale"]                        = {id = 118653, animId = { [60] = 0, [1] = 0 },},
-        ["character/felorc/male/felorcmaleaxe"]                     = {id = 118654, animId = { [60] = 0, [1] = 0 },},
-        ["character/felorc/male/felorcmalesword"]                   = {id = 118667, animId = { [60] = 0, [1] = 0 },},
-        ["character/foresttroll/male/foresttrollmale"]              = {id = 118798, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/female/gnomefemale"]                      = {id = 119063, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/female/gnomefemale_hd"]                   = {id = 940356, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/female/gnomefemale_npc"]                  = {id = 940356, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/male/gnomemale"]                          = {id = 119159, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/male/gnomemale_hd"]                       = {id = 900914, animId = { [60] = 0, [1] = 0 },},
-        ["character/gnome/male/gnomemale_npc"]                      = {id = 900914, animId = { [60] = 0, [1] = 0 },},
-        ["character/goblin/female/goblinfemale"]                    = {id = 119369, animId = { [60] = 0, [1] = 0 },},
-        ["character/goblin/male/goblinmale"]                        = {id = 119376, animId = { [60] = 0, [1] = 0 },},
-        ["character/goblinold/male/goblinoldmale"]                  = {id = 119376, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/female/humanfemale"]                      = {id = 119563, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/female/humanfemale_hd"]                   = {id = 1000764, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/female/humanfemale_npc"]                  = {id = 1000764, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/male/humanmale"]                          = {id = 119940, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/male/humanmale_cata"]                     = {id = 119940, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/male/humanmale_hd"]                       = {id = 1011653, animId = { [60] = 0, [1] = 0 },},
-        ["character/human/male/humanmale_npc"]                      = {id = 1011653, animId = { [60] = 0, [1] = 0 },},
-        ["character/icetroll/male/icetrollmale"]                    = {id = 232863, animId = { [60] = 0, [1] = 0 },},
-        ["character/naga_/female/naga_female"]                      = {id = 120263, animId = { [60] = 0, [1] = 0 },},
-        ["character/naga_/male/naga_male"]                          = {id = 120294, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/female/nightelffemale"]                = {id = 120590, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/female/nightelffemale_hd"]             = {id = 921844, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/female/nightelffemale_npc"]            = {id = 921844, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/male/nightelfmale"]                    = {id = 120791, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/male/nightelfmale_hd"]                 = {id = 974343, animId = { [60] = 0, [1] = 0 },},
-        ["character/nightelf/male/nightelfmale_npc"]                = {id = 974343, animId = { [60] = 0, [1] = 0 },},
-        ["character/northrendskeleton/male/northrendskeletonmale"]  = {id = 233367, animId = { [60] = 0, [1] = 0 },},
-        ["character/orc/female/orcfemale"]                          = {id = 121087, animId = { [60] = 1.900, [1] = 0 },},
-        ["character/orc/female/orcfemale_npc"]                      = {id = 121087, animId = { [60] = 1.900, [1] = 0 },},
-        ["character/orc/male/orcmale"]                              = {id = 121287, animId = { [60] = 1.900, [1] = 2.000 },},
-        ["character/orc/male/orcmale_hd"]                           = {id = 917116, animId = { [60] = 0, [1] = 0 },},
-        ["character/orc/male/orcmale_npc"]                          = {id = 917116, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/female/scourgefemale"]                  = {id = 121608, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/female/scourgefemale_hd"]               = {id = 997378, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/female/scourgefemale_npc"]              = {id = 997378, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/male/scourgemale"]                      = {id = 121768, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/male/scourgemale_hd"]                   = {id = 959310, animId = { [60] = 0, [1] = 0 },},
-        ["character/scourge/male/scourgemale_npc"]                  = {id = 959310, animId = { [60] = 0, [1] = 0 },},
-        ["character/skeleton/male/skeletonmale"]                    = {id = 121942, animId = { [60] = 0, [1] = 0 },},
-        ["character/taunka/male/taunkamale"]                        = {id = 233878, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/female/taurenfemale"]                    = {id = 121961, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/female/taurenfemale_hd"]                 = {id = 986648, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/female/taurenfemale_npc"]                = {id = 986648, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/male/taurenmale"]                        = {id = 122055, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/male/taurenmale_hd"]                     = {id = 968705, animId = { [60] = 0, [1] = 0 },},
-        ["character/tauren/male/taurenmale_npc"]                    = {id = 968705, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/female/trollfemale"]                      = {id = 122414, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/female/trollfemale_hd"]                   = {id = 1018060, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/female/trollfemale_npc"]                  = {id = 1018060, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/male/trollmale"]                          = {id = 122560, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/male/trollmale_hd"]                       = {id = 1022938, animId = { [60] = 0, [1] = 0 },},
-        ["character/troll/male/trollmale_npc"]                      = {id = 1022938, animId = { [60] = 0, [1] = 0 },},
-        ["character/tuskarr/male/tuskarrmale"]                      = {id = 122738, animId = { [60] = 0, [1] = 0 },},
-        ["character/vrykul/male/vrykulmale"]                        = {id = 122815, animId = { [60] = 0, [1] = 0 },},
-    },
-    ["HD"] = {
-        ["character/scourge/female/scourgefemale"]                  = {id = 997378, animId = { [60] = 0, [1] = 0 },},
-    },
+                                            -- A lookup table for the model IDs and talk animation lengths
+local modelIdAnimLength = {                 -- If anims other than "talk" are used they would have to be...
+                                            -- added to this list with their corresponding length
+                                            -- Anim [60]: Talk emote
+                                            -- Anim [1]: Dance emote
+                                            -- to add new animation use ",[animLength] = lengthOfAnim," for each model
+    ["character/bloodelf/female/bloodelffemale_hd"]             = {id = 1100258,    animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/bloodelf/female/bloodelffemale"]                = {id = 116921,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/bloodelf/male/bloodelfmale_hd"]                 = {id = 1100087,    animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/bloodelf/male/bloodelfmale"]                    = {id = 117170,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/broken/female/brokenfemale"]                    = {id = 117400,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/broken/male/brokenmale"]                        = {id = 117412,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/draenei/female/draeneifemale"]                  = {id = 117437,     animLength = { [60] = 3.000, [1] = 0 },},
+    ["character/draenei/female/draeneifemale_hd"]               = {id = 1022598,    animLength = { [60] = 3.000, [1] = 0 },},
+    ["character/draenei/male/draeneimale"]                      = {id = 117721,     animLength = { [60] = 3.334, [1] = 0 },},
+    ["character/draenei/male/draeneimale_hd"]                   = {id = 1005887,    animLength = { [60] = 3.334, [1] = 0 },},
+    ["character/dwarf/female/dwarffemale"]                      = {id = 118135,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/dwarf/female/dwarffemale_hd"]                   = {id = 950080,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/dwarf/female/dwarffemale_npc"]                  = {id = 950080,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/dwarf/male/dwarfmale"]                          = {id = 118355,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/dwarf/male/dwarfmale_hd"]                       = {id = 878772,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/dwarf/male/dwarfmale_npc"]                      = {id = 878772,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/felorc/female/felorcfemale"]                    = {id = 118652,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/felorc/male/felorcmale"]                        = {id = 118653,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/felorc/male/felorcmaleaxe"]                     = {id = 118654,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/felorc/male/felorcmalesword"]                   = {id = 118667,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/foresttroll/male/foresttrollmale"]              = {id = 118798,     animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/gnome/female/gnomefemale"]                      = {id = 119063,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/gnome/female/gnomefemale_hd"]                   = {id = 940356,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/gnome/female/gnomefemale_npc"]                  = {id = 940356,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/gnome/male/gnomemale"]                          = {id = 119159,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/gnome/male/gnomemale_hd"]                       = {id = 900914,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/gnome/male/gnomemale_npc"]                      = {id = 900914,     animLength = { [60] = 4.000, [1] = 0 },},
+    ["character/goblin/female/goblinfemale"]                    = {id = 119369,     animLength = { [60] = 1.800, [1] = 0 },},
+    ["character/goblin/male/goblinmale"]                        = {id = 119376,     animLength = { [60] = 1.800, [1] = 0 },},
+    ["character/goblinold/male/goblinoldmale"]                  = {id = 119376,     animLength = { [60] = 1.800, [1] = 0 },},    -- not sure, does it have this anim? need to check
+    ["character/human/female/humanfemale"]                      = {id = 119563,     animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/human/female/humanfemale_hd"]                   = {id = 1000764,    animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/human/female/humanfemale_npc"]                  = {id = 1000764,    animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/human/male/humanmale"]                          = {id = 119940,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/human/male/humanmale_cata"]                     = {id = 119940,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/human/male/humanmale_hd"]                       = {id = 1011653,    animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/human/male/humanmale_npc"]                      = {id = 1011653,    animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/icetroll/male/icetrollmale"]                    = {id = 232863,     animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/naga_/female/naga_female"]                      = {id = 120263,     animLength = { [60] = 3.000, [1] = 0 },},
+    ["character/naga_/male/naga_male"]                          = {id = 120294,     animLength = { [60] = 3.000, [1] = 0 },},
+    ["character/nightelf/female/nightelffemale"]                = {id = 120590,     animLength = { [60] = 2.100, [1] = 0 },},
+    ["character/nightelf/female/nightelffemale_hd"]             = {id = 921844,     animLength = { [60] = 2.100, [1] = 0 },},
+    ["character/nightelf/female/nightelffemale_npc"]            = {id = 921844,     animLength = { [60] = 2.100, [1] = 0 },},
+    ["character/nightelf/male/nightelfmale"]                    = {id = 120791,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/nightelf/male/nightelfmale_hd"]                 = {id = 974343,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/nightelf/male/nightelfmale_npc"]                = {id = 974343,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/northrendskeleton/male/northrendskeletonmale"]  = {id = 233367,     animLength = { [60] = 3.600, [1] = 0 },},
+    ["character/orc/female/orcfemale"]                          = {id = 121087,     animLength = { [60] = 1.900, [1] = 0 },},
+    ["character/orc/female/orcfemale_npc"]                      = {id = 121087,     animLength = { [60] = 1.900, [1] = 0 },},
+    ["character/orc/male/orcmale"]                              = {id = 121287,     animLength = { [60] = 1.900, [1] = 2.000 },},
+    ["character/orc/male/orcmale_hd"]                           = {id = 917116,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/orc/male/orcmale_npc"]                          = {id = 917116,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/scourge/female/scourgefemale"]                  = {id = 121608,     animLength = { [60] = 2.000, [1] = 0 },},
+    ["character/scourge/female/scourgefemale_hd"]               = {id = 997378,     animLength = { [60] = 2.467, [1] = 0 },},
+    ["character/scourge/female/scourgefemale_npc"]              = {id = 997378,     animLength = { [60] = 2.467, [1] = 0 },},
+    ["character/scourge/male/scourgemale"]                      = {id = 121768,     animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/scourge/male/scourgemale_hd"]                   = {id = 959310,     animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/scourge/male/scourgemale_npc"]                  = {id = 959310,     animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/skeleton/male/skeletonmale"]                    = {id = 121942,     animLength = { [60] = 2.667, [1] = 0 },},
+    ["character/taunka/male/taunkamale"]                        = {id = 233878,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/female/taurenfemale"]                    = {id = 121961,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/female/taurenfemale_hd"]                 = {id = 986648,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/female/taurenfemale_npc"]                = {id = 986648,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/male/taurenmale"]                        = {id = 122055,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/male/taurenmale_hd"]                     = {id = 968705,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/tauren/male/taurenmale_npc"]                    = {id = 968705,     animLength = { [60] = 2.934, [1] = 0 },},
+    ["character/troll/female/trollfemale"]                      = {id = 122414,     animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/troll/female/trollfemale_hd"]                   = {id = 1018060,    animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/troll/female/trollfemale_npc"]                  = {id = 1018060,    animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/troll/male/trollmale"]                          = {id = 122560,     animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/troll/male/trollmale_hd"]                       = {id = 1022938,    animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/troll/male/trollmale_npc"]                      = {id = 1022938,    animLength = { [60] = 2.500, [1] = 0 },},
+    ["character/tuskarr/male/tuskarrmale"]                      = {id = 122738,     animLength = { [60] = 3.000, [1] = 0 },},
+    ["character/vrykul/male/vrykulmale"]                        = {id = 122815,     animLength = { [60] = 3.600, [1] = 0 },},
+    ["character/scourge/female/scourgefemale"]                  = {id = 997378,     animLength = { [60] = 0, [1] = 0 },},
+    ["character/goblin/female/goblinfemale"]                    = {id = 119369,     animLength = { [60] = 4.667, [1] = 0 },},
+    ["character/goblin/male/goblinmale"]                        = {id = 119376,     animLength = { [60] = 4.667, [1] = 0 },},
 }
-local function CleanupModelName(model)                                          -- Found this workaround here: https://github.com/mrthinger/wow-voiceover
-    model = string.lower(model)                                                 -- make string lowercase
-    model = string.gsub(model, "\\", "/")                                       -- Replace backslashes with forward slashes
-    model = string.gsub(model, "%.m2", "")                                      -- remove the literal string .m2
-    model = string.gsub(model, "%.mdx", "")                                     -- remove the literal string .mdx
-    return model                                                                -- return cleaned up string
+
+local function formatPath(inputString)
+    --local formattedPath = string.gsub(inputString, "%.m2$", "")
+    local formattedPath = string.gsub(inputString, "\\", "/")
+    formattedPath = string.lower(formattedPath)
+    return formattedPath
 end
 
--- WoW 1.12 code
-if string.sub(CLIENT_VERSION, 1, 1) == "1" then                                 -- Found this workaround here: https://github.com/mrthinger/wow-voiceover
+
+-- WoW 1.12 code override of GetModelFileID that was later introduced
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then                                 -- Found this workaround here: https://github.com/mrthinger/wow-voiceover
     function GetModelFileID()                                                   -- GetModelFileID is a native function in new wow, this replicates it somewhat
-        local model = model:GetModel()                                          -- get model string path of portrait model
-        if model and type(model) == "string" then                               -- if it exists and is a string
-            model = CleanupModelName(model)                                     -- remove file type from path
-            return modelToFileID["Original"][model].id                          -- return model ID from lookup table
+        local modelPath = model:GetModel()                                          -- get model string path of portrait model
+        if modelPath and type(modelPath) == "string" then                           -- if it exists and is a string
+            modelPath = formatPath(modelPath)
+            return modelIdAnimLength[modelPath].id                                  -- return model ID from lookup table
         end
     end
 end
@@ -675,18 +846,23 @@ end
 
 function GetAnimLength(inputAnimId)                                             -- Using a lookup table to get the animLength for the input Animation
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then                             -- 
-        local model = model:GetModel()                                          -- WoW 1.12 has a function to get the model path...
-        model = CleanupModelName(model)                                         -- ...need to remove file extensions...
-        return modelToFileID["Original"][model]["animId"][inputAnimId]          -- then use model path to lookup the AnimLength for input animation
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then                             -- 
+        local modelPath = model:GetModel()                                      -- WoW 1.12 has a function to get the model path...
+        modelPath = formatPath(modelPath)
+        if modelPath == "character/goblin/female/goblinfemale"                  -- Goblins did not have talk anims in WoW 1.12
+        or modelPath == "character/goblin/male/goblinmale" then
+            return 0
+        else
+            return modelIdAnimLength[modelPath]["animLength"][inputAnimId]      -- then use model path to lookup the AnimLength for input animation
+        end
     -- END WoW 1.12 Code
     -- New WoW Code
     else
         local animLength = 0                                                    -- New WoW has removed t he GetModel function
         local modelId = model:GetModelFileID()                                  -- I could not find any way to get the model file path
-        for k, v in pairs(modelToFileID["Original"]) do                         -- Which is why I'm looping through the table looking for the NPC id
+        for k, v in pairs(modelIdAnimLength) do                                 -- Which is why I'm looping through the table looking for the NPC id
             if v.id == modelId then                                             --
-                animLength = v.animId[inputAnimId]                              -- Then I just read the value for animLength
+                animLength = v.animLength[inputAnimId]                              -- Then I just read the value for animLength
             end
         end
         return animLength
@@ -697,9 +873,9 @@ end
 
 local function HasModelLoaded(modelCheck)
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
-        local model = model:GetModel()                                              -- get model string path of portrait model
-        return model and type(model) == "string" and GetModelFileID() ~= 130737     -- is model not nil, is it a string, and is it not ID 130737 (the default model)
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+        local modelPath = model:GetModel()                                              -- get model string path of portrait model
+        return modelPath and type(modelPath) == "string" and GetModelFileID() ~= 130737 -- is model not nil, is it a string, and is it not ID 130737 (the default model)
     -- END WoW 1.12 Code
     -- New WoW Code
     else                                                                            -- New WoW has a GetModelFileID, so we dont need any workarounds
@@ -711,7 +887,7 @@ end
 function playAnimation(sequenceID, animLoops)                           -- SequenceID = Animation ID, animLoops = number of times the anim loops
                                                                         -- AnimLoops depends on the length of the npc dialogue (not the sound file if it exists)
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         local sequenceDuration = GetAnimLength(sequenceID)*1000         -- Using lookup table to get AnimLength
         local animTimer = 0                                             -- helper var to count how long the anim has played already
         local animLoopCount =  0                                        -- helper var to count how many anims were played
@@ -780,16 +956,15 @@ local function createTalkingHead()                                      -- The f
     model:SetHeight(120)                                        -- so that it does not go over the border texture
     model:SetUnit("target")                                     -- Set the model to that of our target npc
     -- placeholder code goes here!                              -- if we don't have a target npc, we use a placeholder
-    --model:SetPosition(0, 0, 0)
+    model:SetModelScale(1)
+    model:SetPosition(0, 0, 0)
     -- WoW 1.12 settings
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         model:SetRotation(math.rad(10))                         -- Rotation seems to be the only setting working before full model initialisation
         local function OnUpdate(frame, elapsed)                 -- Need to wait for model init before we can set the other model settings
-            if HasModelLoaded(model) then                       -- custom function if model ID is valid and not the default model 
-                                                                -- mostly taken from https://github.com/mrthinger/wow-voiceover 
-                model:SetModelScale(4)                          -- Setting size and...
-                model:SetPosition(0, 0, -2.8)                   -- setting Position to get a portrait close up shot of the model
-                model:SetPosition(0, 0, -5)
+            if HasModelLoaded(model) then                       -- custom function if model ID is valid and not the default model    
+                model:SetModelScale(3.5)                        -- Setting size and...
+                model:SetPosition(0, 0, -4)                     -- setting Position to get a portrait close up shot of the model --(0,0,-2.8)
                 talkingHead:SetScript("OnUpdate", nil)          -- after setting our desired "camera" settings stop the OnUpdate
             end
         end
@@ -800,7 +975,6 @@ local function createTalkingHead()                                      -- The f
     -- New WoW settings
     else
         model:SetPortraitZoom(1.0)                              -- For New WoW we can just set the Portrait Zoom level. Nice and easy
-       -- model:SetPosition(0, 0, 0)
     -- END New WoW settings
 
     end
@@ -816,7 +990,7 @@ createNameList()
 local function isInNameList(name)
     local nameFound = false
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         if string.find(table.concat(nameList, ","), name) then
             nameFound = true
         end
@@ -853,7 +1027,7 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
             DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1)
             DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
             -- New WoW Code                                                                         -- WoW 1.12 does not have the SetMask function
-            if string.sub(CLIENT_VERSION, 1, 1) ~= "1" then
+            if string.sub(CLIENT_VERSION, 1, 2) ~= "1." then
                 DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask")      -- set the mask texture to make the icon round 
             end
             DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
@@ -868,20 +1042,29 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
 
         -- -- Add texture to target DialogueMarkerFrame
         if not targetIcon then
-            targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
+            if string.sub(CLIENT_VERSION, 1, 2) == "10" then
+                targetIcon = TargetFrame:CreateTexture(nil, "OVERLAY")
+            else
+                targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
+            end
+            
             targetIcon:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-Chat-Up")
             targetIcon:SetWidth(26)
             targetIcon:SetHeight(26)
             targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
             targetIcon:SetVertexColor(1, 1, 1)
-            targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
+            if string.sub(CLIENT_VERSION, 1, 2) == "10" then
+                targetIconBorder = TargetFrame:CreateTexture(nil, "BORDER")
+            else
+                targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
+            end
             targetIconBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
             targetIconBorder:SetWidth(50)
             targetIconBorder:SetHeight(50)
             targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11)
                         
             -- WoW 1.12 Code             -- WoW 1.12 does not have the SetMask function
-            if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+            if string.sub(CLIENT_VERSION, 1, 2) == "1." then
                 targetIcon:SetDrawLayer("BACKGROUND", 1)
                 targetIconBorder:SetDrawLayer("BORDER", 2)
             -- New WoW Code
@@ -924,7 +1107,7 @@ end)
 -- Function to start playing dialogue sound files
 function PlayDialogue(CurrentDialogue, DatabaseName)
     -- WoW 1.12 Code                                                                                -- WoW 1.12 does not have sound handles, the audio can't be stopped
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then                                                 -- without workarounds, which aren't implemented yet
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then                                                 -- without workarounds, which aren't implemented yet
         local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
         PlaySoundFile(audioFile)
     -- New WoW Code                                                                                 -- New WoW can play sound and give it a handle to stop that sound
@@ -938,7 +1121,7 @@ end
 -- Function to stop playing current dialogue sound file
 function StopDialogue(CurrentDialogue)
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         -- does nothing in WoW 1.12 atm
     -- New WoW Code
     else
@@ -1020,6 +1203,7 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
     if CurrentDialogue == nil then                                                          -- Hide everything and return out of the function if
         DialogueFrame:Hide()                                                                -- for some reason the dialogue table cannot be found for the NPC
         talkingHead:Hide()
+        model:ClearModel()
         for index, QuestionButton in ipairs(QuestionButtons) do
             QuestionButton:Hide()
         end
@@ -1045,6 +1229,7 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
             DialogueFrame:Hide()
             QuestionFrame:Hide()
             talkingHead:Hide()
+            model:ClearModel()
             ShowUI()
             return
         end
@@ -1107,6 +1292,18 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
                 QuestionButtons[i]:Show()                                                   -- Reveal the question button (player choice)
                 QuestionCounter = QuestionCounter + 1                                       -- To keep track of how many valid player choices we have activated
                 QuestionButtons[i]:SetText(CurrentDialogue[ButtonName])                     -- Set the text of the question buttons to the text of the player choice 1-4
+
+                if string.len(CurrentDialogue[ButtonName]) >= 33 then                       -- Resize the text if the player dialogue choice is too long
+                    local maxLength = 33
+                    local textLength = string.len(CurrentDialogue[ButtonName])
+                    local textSizeModifier = maxLength / textLength
+                    local fontSize = DialogueChoiceFontSize * textSizeModifier
+                    local QuestionButtonText = QuestionButtons[i]:GetFontString()
+                    QuestionButtonText:SetFont(QuestionButtonText:GetFont(), fontSize)
+                else
+                    local QuestionButtonText = QuestionButtons[i]:GetFontString()
+                    QuestionButtonText:SetFont(QuestionButtonText:GetFont(), DialogueChoiceFontSize)
+                end 
 
                 if (StoryExtendedDB[npcID] ~= nil                                           -- Check if the player choice has already been seen before / clicked before...
                 and StoryExtendedDB[npcID][npcIndexID] ~= nil
@@ -1179,6 +1376,7 @@ function UpdateDialogue(Dialogue, NextID, dialogueEnds, DatabaseName, notNPC)
         end
         QuestionFrame:Hide()
         talkingHead:Hide()
+        model:ClearModel()
         ShowUI()
         CurrentID = StoryExtendedDB[npcID][targetName]
         dialogueEnds = false
@@ -1297,12 +1495,12 @@ local function OnZoneChanged()                                                  
     local foundName
     if isInNameList(zoneName) then                                                          -- check if either the zone name...
         foundName = zoneName
-    else if isInNameList(subzone) then                                                      -- or subzone name is in one of the lists
+    elseif isInNameList(subzone) then                                                      -- or subzone name is in one of the lists
         foundName = subzone                                                                 -- for now subzone has priority over zone name if both are in the name list
     end                                                                                     -- I will change this later
     if foundName then
         -- WoW 1.12 Code
-        if string.sub(CLIENT_VERSION, 1, 1) == "1" then
+        if string.sub(CLIENT_VERSION, 1, 2) == "1." then
             StoryExtended:ScheduleTimer(function() TalkStoryFunc(subzone) end, 2)          -- Have to use AceTimer in classic to delay the dialogue for a bit
         -- New WoW Code
         else
@@ -1322,6 +1520,12 @@ function StoryExtended:SlashCommand(msg)                                        
     if(msg == "talk") then                                                                  -- makes it easy to make a talk makro and set it on a keyboard button
         TalkStoryFunc()
     end
+    if(msg == "settings") then
+        InterfaceOptionsFrame_OpenToCategory("StoryExtended")
+    end
+    if(msg == "options") then
+    InterfaceOptionsFrame_OpenToCategory("StoryExtended")
+    end
 end
 
 -- Hide all the frames on game/addon start
@@ -1329,6 +1533,7 @@ DialogueFrame:Hide()
 QuestionFrame:Hide()
 if talkingHead then
     talkingHead:Hide()
+    model:ClearModel()
 end
 for index, QuestionButton in ipairs(QuestionButtons) do
     QuestionButton:Hide()

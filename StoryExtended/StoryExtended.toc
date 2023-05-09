@@ -3,6 +3,7 @@
 ## Interface: 48632
 ## SavedVariablesPerCharacter: StoryExtendedDB
 ## SavedVariables: GlobalStoryExtendedDB
+environment.lua
 db\quests.lua
 embeds.xml
 StoryExtended.lua
