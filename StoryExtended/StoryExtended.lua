@@ -30,7 +30,7 @@ local DialogueChoiceFontSize = 14                                               
 local StoryExtendedMinimapIcon
 local StoryExtendedLDB
 local showMinimapBtn = true
-
+local AceTimer
 -- Helper Functions from AI_VoiceOver by MrThinger
 
 if not select then
@@ -58,30 +58,12 @@ end
 -- ^^^ Helper Functions from AI_VoiceOver by MrThinger
 
 
-local AceTimer
+
 if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     -- Client version is 1.12 or below
 else
     -- Client version is higher than 1.12
 end
-
-
-dialogueDataAddons =
-{
-    availableDataAddons = {},         -- A list of data addons that were found by the main addon
-    -- availableDataAddonsOrdered = {},  -- 
-    registeredDataAddons = {},        -- A list of data addons that registered themselves with the main addon after being activated
-}
-
-
--- Register the data addons
-
-function StoryExtended:Register(name, dataAddon)
-    assert(not dialogueDataAddons.registeredDataAddons[name], format([[Data addon "%s" already registered]], name))     -- Check if the addon is already registered
-    dialogueDataAddons.registeredDataAddons[name] = dataAddon                                                           -- Add the data addon data to the array under its name
-end
-
-
 
 -- Load the saved variables from disk when the addon is loaded
 LoadAddOn("StoryExtended")
@@ -92,7 +74,7 @@ LoadAddOn("StoryExtended")
 
 --END Ace3 Options menu for New WoW
 
--- Ace3 function for when Addon is initialized. Fired too early for my uses. The SavedVariables aren't loaded yet when this fires
+-- Ace3 function for when Addon is initialized. Fired too early for loading db here. The SavedVariables aren't loaded yet when this fires
 function StoryExtended:OnInitialize()
 -- Create the minimap button
     StoryExtendedLDB = LibStub("LibDataBroker-1.1"):NewDataObject("StoryExtendedMMBtn", {
@@ -116,13 +98,6 @@ function StoryExtended:OnInitialize()
 StoryExtendedMinimapIcon = LibStub("LibDBIcon-1.0")
 end
 
-function SE_ToggleMinimapBtn()
-    if StoryExtended.db.profile.minimap and StoryExtended.db.profile.minimap.hide then
-        StoryExtendedMinimapIcon:Hide("StoryExtendedMMBtn")
-    else
-        StoryExtendedMinimapIcon:Show("StoryExtendedMMBtn")
-    end
-end
 
 -- Ace3 function for when Addon is enabled
 function StoryExtended:OnEnable()
@@ -230,6 +205,15 @@ function StoryExtended:OnEnable()
                 },
             }
         }
+
+        function SE_ToggleMinimapBtn()
+            if StoryExtended.db.profile.minimap and StoryExtended.db.profile.minimap.hide then
+                StoryExtendedMinimapIcon:Hide("StoryExtendedMMBtn")
+            else
+                StoryExtendedMinimapIcon:Show("StoryExtendedMMBtn")
+            end
+        end
+
         StoryExtended:RegisterOptionsTable("StoryExtended_options", options)                                        -- Register the main options menu
         StoryExtended.optionsFrame = AceConfigDialog:AddToBlizOptions("StoryExtended_options", "StoryExtended")
         SLASH_StoryExtended1 = "/storyextended"                                                                     -- Create a slash command 
@@ -357,6 +341,45 @@ end
 
 -- Ace3 functions End
 
+dialogueDataAddons =
+{
+    availableDataAddons = {},         -- A list of data addons that were found by the main addon
+    availableDataAddonsOrdered = {},  -- 
+    registeredDataAddons = {},        -- A list of data addons that registered themselves with the main addon after being activated
+    registeredDataAddonsOrdered = {},
+}
+
+-- order DataAddons by priority
+local function orderDataAddons()
+    local sortedDataAddons = {}
+    local i = 0
+    for _, v in pairs(dialogueDataAddons.registeredDataAddons) do
+        i = i + 1
+        sortedDataAddons[i] = v
+    end
+    table.sort(sortedDataAddons, function(a, b)
+        -- if a.addonPriority == b.addonPriority then
+        --     return a.name < b.name
+        -- else
+            return string.format("%05d", a.addonPriority) > string.format("%05d", (b.addonPriority))
+            
+        -- end
+    end)
+    dialogueDataAddons.registeredDataAddonsOrdered = sortedDataAddons
+end
+
+
+
+
+
+
+-- SelfRegister the data addons
+function StoryExtended:Register(name, dataAddon)
+    assert(not dialogueDataAddons.registeredDataAddons[name], format([[Data addon "%s" already registered]], name))     -- Check if the addon is already registered
+    dialogueDataAddons.registeredDataAddons[name] = dataAddon                                                           -- Add the data addon data to the array under its name
+    orderDataAddons()
+end
+
 -- Check for data addons in the Interface/AddOns folder
 function checkLoadDataAddons()
     for i = 1, GetNumAddOns() do                                                            -- Go through each addon in folder
@@ -365,10 +388,10 @@ function checkLoadDataAddons()
             local dataAddon = {                                                             -- create the dataAddon table with info about data addon
                 dataAddonName = name,                                                       -- name of data addon
                 dataAddonVersion = GetAddOnMetadata(name, "Version"),                       -- data addon version (set by web app)
-                databaseVersion = GetAddOnMetadata(name, "X-StoryExtended-Data-Version"),   -- database version (set by web app), important for compatibility if new...
+                databaseVersion = GetAddOnMetadata(name, "X-StoryExtendedData-Data-Version"),-- database version (set by web app), important for compatibility if new...
                                                                                             -- variables are added later on
-                webAppVersion = GetAddOnMetadata(name, "X-StoryExtended-WebApp-Version"),   -- web app version (set by web app), might be useful for compatibility
-                dataAddonPriority = GetAddOnMetadata(name, "X-StoryExtended-Priority"),     -- dataAddonPriority for when the same NPC is used by more than one...
+                webAppVersion = GetAddOnMetadata(name, "X-StoryExtendedData-WebApp-Version"),-- web app version (set by web app), might be useful for compatibility
+                dataAddonPriority = GetAddOnMetadata(name, "X-StoryExtendedData-Priority"), -- dataAddonPriority for when the same NPC is used by more than one...
                                                                                             -- data addon. Set through web app
             }
             dialogueDataAddons.availableDataAddons[name] = dataAddon                        -- added to list of available data addons
@@ -380,11 +403,6 @@ function checkLoadDataAddons()
 end
 checkLoadDataAddons()
 
--- Add Characters/Events etc. to a list for faster retrieval - Dunno if I should keep this
--- for key, value in pairs(Dialogues) do
---     local currentDialogueExtractor = Dialogues[key]
---     table.insert(NamesWithDialogue, currentDialogueExtractor.Name)
--- end
 
 -- For saving the Character names as numeric values because SavedVariables doesnt like non-numeric values as index...
 -- is what I though after struggling with SavedVariables at first. I don't think that is actually the case but I'm keeping it in for now
@@ -395,49 +413,6 @@ local function hashString(str)
             sum = sum + string.byte(str, i)
         end
         return sum
-end
-
--- Hide the UI (if the option is set)
-local function HideUI()
-    TalkStoryButton:Hide()
-    if HideUIOption == true then
-        MinimapCluster:Hide()
-        PlayerFrame:Hide()
-        TargetFrame:Hide()
-        MainMenuBarArtFrame:Hide()
-        MainMenuExpBar:Hide()
-        MultiCastActionBarFrame:Hide()
-        ChatFrame1:Hide()
-        TotemFrame:Hide()
-        VerticalMultiBarsContainer:Hide()
-        MultiBarLeft:Hide()
-        ChatFrameMenuButton:Hide()
-        ChatFrameChannelButton:Hide()
-        WatchFrame:Hide()
-        StanceBarFrame:Hide()
-    end
-end
--- function to show the UI again after having hidden it (if the option is set)
-local function ShowUI()
-    TalkStoryButton:Show()
-    if HideUIOption == true then
-        MinimapCluster:Show()
-        PlayerFrame:Show()
-        if UnitName("target") ~= nil then
-            TargetFrame:Show()
-        end
-        MainMenuBarArtFrame:Show()
-        MainMenuExpBar:Show()
-        MultiCastActionBarFrame:Show()
-        ChatFrame1:Show()
-        TotemFrame:Show()
-        VerticalMultiBarsContainer:Show()
-        MultiBarLeft:Show()
-        ChatFrameMenuButton:Show()
-        ChatFrameChannelButton:Show()
-        WatchFrame:Show()
-        StanceBarFrame:Show()
-    end
 end
 
 -- save the current profile before the addon is unloaded
@@ -538,7 +513,7 @@ ManualQuestFinish(4641)
 local function createNameList()
     -- WoW 1.12 Code
     if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-        for _, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do               -- Goes through each data addon dialogue DB...
+        for _, dataAddon in pairs(dialogueDataAddons.registeredDataAddonsOrdered) do               -- Goes through each data addon dialogue DB...
             local dialogueData = dataAddon.GetDialogue                                      -- looks for the namefield and checks if that name...
             local checkDialogues = dialogueData                                             -- is already present in the nameList
             for _, dialogData in ipairs(checkDialogues) do                                  -- if not it adds that name to the namelist
@@ -550,7 +525,7 @@ local function createNameList()
     -- New WoW Code
     else
         --check which data addon to use
-        for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do            -- Functions like the 1.12 code but uses...
+        for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddonsOrdered) do            -- Functions like the 1.12 code but uses...
             local dialogueData = dataAddon.GetDialogue                                      -- "table.oncat...:find" instead of "string.find(table.concat)"
             local checkDialogues = dialogueData
             for key, value in pairs(checkDialogues) do
@@ -562,7 +537,65 @@ local function createNameList()
     end
 end
 
+-- WoW 1.12 compat function
+local function isInNameList(name)
+    local nameFound = false
+    -- WoW 1.12 Code
+    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+        if string.find(table.concat(nameList, ","), name) then
+            nameFound = true
+        end
+    -- New WoW Code
+    else
+        if table.concat(nameList, ","):find(name) then
+            nameFound = true
+        end
+    end
+    return nameFound
+end
 
+-- Hide the UI (if the option is set)
+local function HideUI()
+    TalkStoryButton:Hide()
+    if HideUIOption == true then
+        MinimapCluster:Hide()
+        PlayerFrame:Hide()
+        TargetFrame:Hide()
+        MainMenuBarArtFrame:Hide()
+        MainMenuExpBar:Hide()
+        MultiCastActionBarFrame:Hide()
+        ChatFrame1:Hide()
+        TotemFrame:Hide()
+        VerticalMultiBarsContainer:Hide()
+        MultiBarLeft:Hide()
+        ChatFrameMenuButton:Hide()
+        ChatFrameChannelButton:Hide()
+        WatchFrame:Hide()
+        StanceBarFrame:Hide()
+    end
+end
+-- function to show the UI again after having hidden it (if the option is set)
+local function ShowUI()
+    TalkStoryButton:Show()
+    if HideUIOption == true then
+        MinimapCluster:Show()
+        PlayerFrame:Show()
+        if UnitName("target") ~= nil then
+            TargetFrame:Show()
+        end
+        MainMenuBarArtFrame:Show()
+        MainMenuExpBar:Show()
+        MultiCastActionBarFrame:Show()
+        ChatFrame1:Show()
+        TotemFrame:Show()
+        VerticalMultiBarsContainer:Show()
+        MultiBarLeft:Show()
+        ChatFrameMenuButton:Show()
+        ChatFrameChannelButton:Show()
+        WatchFrame:Show()
+        StanceBarFrame:Show()
+    end
+end
 
 -- Create a frame to hold the dialogue
 --
@@ -983,23 +1016,6 @@ end
 -- Call the createNameList Function
 createNameList()
 
--- WoW 1.12 compat function
-local function isInNameList(name)
-    local nameFound = false
-    -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-        if string.find(table.concat(nameList, ","), name) then
-            nameFound = true
-        end
-    -- New WoW Code
-    else
-        if table.concat(nameList, ","):find(name) then
-            nameFound = true
-        end
-    end
-    return nameFound
-end
-
 -- Add texture to name plate of NPC if they have dialogue
 local DialogueMarkerIcon = nil
 local targetIcon = nil
@@ -1400,7 +1416,7 @@ end
 
 -- Check the databases for dialogue
 local function chooseDatabase(targetName)
-    for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddons) do                -- loop through the registered data addons
+    for name, dataAddon in pairs(dialogueDataAddons.registeredDataAddonsOrdered) do                -- loop through the registered data addons
         local addonName = name                                                              -- Setup their variables
         local dialogueData = dataAddon.GetDialogue
         local checkDialogues = dialogueData
