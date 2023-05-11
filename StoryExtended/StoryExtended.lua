@@ -2,13 +2,12 @@ setfenv(1, StoryExtendedEnv)
 local CLIENT_VERSION, BUILD = GetBuildInfo()
 
 if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-    print("test")
     StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0", "AceTimer-3.0", "AceConfig-3.0")
 else
     StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0")
 end
 
-StoryExtendedDB = {}                                                            -- The save variable which is written into SavedVariables
+
 CurrentID = 1                                                                   -- the current dialogue ID (the ID for which text is shown currently)
 local NextID                                                                    -- The ID for the upcoming Dialogue
 local HideUIOption = false
@@ -31,8 +30,10 @@ local StoryExtendedMinimapIcon
 local StoryExtendedLDB
 local showMinimapBtn = true
 local AceTimer
--- Helper Functions from AI_VoiceOver by MrThinger
+local ManualQuestFinish
 
+-- Helper Functions from AI_VoiceOver by MrThinger
+--DEFAULT_CHAT_FRAME:AddMessage()
 if not select then
     function select(index, ...)
         if index == "#" then
@@ -57,8 +58,6 @@ if not string.match then
 end
 -- ^^^ Helper Functions from AI_VoiceOver by MrThinger
 
-
-
 if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     -- Client version is 1.12 or below
 else
@@ -66,7 +65,7 @@ else
 end
 
 -- Load the saved variables from disk when the addon is loaded
-LoadAddOn("StoryExtended")
+--LoadAddOn("StoryExtended")
 
 
 -- Ace3 functions Begin
@@ -101,11 +100,33 @@ end
 
 -- Ace3 function for when Addon is enabled
 function StoryExtended:OnEnable()
+
     -- WoW 1.12 Code
     if string.sub(CLIENT_VERSION, 1, 2) == "1." then
         local AceConfigDialog = LibStub("AceConfigDialog-3.0")
         local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
+        local AceGUI = LibStub("AceGUI-3.0")
+        local function createTextInput()
+            local frame = AceGUI:Create("Frame")
+            frame:SetTitle("Quest finisher")
+            frame:SetWidth(500)
+            frame:SetHeight(200)
+            
+            local input = AceGUI:Create("EditBox")
+            input:SetWidth(250)
+            input:SetLabel("Enter QuestID:")
+            frame:AddChild(input)
+            
+            local button = AceGUI:Create("Button")
+            button:SetText("Finish Quest")
+            button:SetWidth(200)
+            button:SetCallback("OnClick", function()
+                local inputValue = input:GetText()
+                ManualQuestFinish(inputValue)
+            end)
+            frame:AddChild(button)
+        end
 
         local defaults = {                                                              -- the Default values for the options menu
         profile = {
@@ -203,6 +224,12 @@ function StoryExtended:OnEnable()
                     end,
                     get = function (info) return StoryExtended.db.profile.minimap.hide end,
                 },
+                addQuestFinished = {
+                    type = 'execute',
+                    name = 'Mark Quest finished',
+                    desc = 'Mark a quest as finished if it was not auto-detected.',
+                    func = createTextInput,
+                },
             }
         }
 
@@ -231,7 +258,6 @@ function StoryExtended:OnEnable()
         showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
         animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
         SE_ToggleMinimapBtn()                                                                                       -- toggle minimap button
-
     -- New WoW Code
     else
         local defaults = {                                                                  -- the Default values for the options menu
@@ -420,40 +446,6 @@ function StoryExtended:OnShutdown()
     StoryExtended.db:ProfileChanged(StoryExtended.db:GetCurrentProfile())
 end
 
--- Function that saves data into SavedVariables
-local function StoryExtended_OnEvent(self, event, addonName)
-    -- wow 1.12 code. 1.12 seems to save a tad bit differently into SavedVariables
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-        if event == "ADDON_LOADED" and addonName == "StoryExtended" then
-            if not StoryExtendedDB then
-                StoryExtendedDB = {}
-            end
-        end
-    -- New WoW code
-    else
-        if event == "ADDON_LOADED" and addonName == "StoryExtended" then            -- When the StoryExtended Addons loads:
-            if not StoryExtendedDB then
-                StoryExtendedDB = {}                                                -- Initialize the StoryExtendedDB table if it does not exist
-            end
-            if SavedStoryExtendedDB then
-                StoryExtendedDB = SavedStoryExtendedDB                              -- Load saved database if it exists
-            end
-        elseif event == "PLAYER_LOGOUT" then                                        -- on logout
-            if StoryExtendedDB then
-                SavedStoryExtendedDB = StoryExtendedDB                              -- save StoryExtendedDB
-            end
-        end
-    end
-end
-
--- Helper Frame to make StoryExtended_OnEvent listen to events
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGOUT")
-frame:SetScript("OnEvent", StoryExtended_OnEvent)
-
-
-
 -- Workaround for storing completed Quests for wow 1.12
 --      WoW 1.12 does not have functionality for checking a QuestID for its QuestComplete status
 --      It also does not have a function to get a quest ID from anything
@@ -475,6 +467,7 @@ end
 -- Mark the quest as finished in the SavedVariables
 function markQuestFinished(questId)
     if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+        DEFAULT_CHAT_FRAME:AddMessage("Mark quest finished")
         if not StoryExtendedDB[99999] then                                          -- The table keys are numericals so I chose a high number for the QuestList
             StoryExtendedDB[99999] = {}                                             -- Create the table if it doesn't exist
         end
@@ -497,15 +490,21 @@ if string.sub(CLIENT_VERSION, 1, 2) == "1." then
 -- Overwrite Complete Quest button 
     QuestRewardCompleteButton_OnClick = customQuestRewardCompleteButton_OnClick
 end
--- If players want or have to set a quest to finished manually
-local function ManualQuestFinish(questID)
+
+function ManualQuestFinish(questID)
+    questID = tonumber(questID)
     if not StoryExtendedDB[99999] then
         StoryExtendedDB[99999] = {}
     end
     StoryExtendedDB[99999][questID] = true
+    DEFAULT_CHAT_FRAME:AddMessage(tostring(StoryExtendedDB[99999][questID]))
+    for k, v in pairs(StoryExtendedDB) do
+        DEFAULT_CHAT_FRAME:AddMessage(k)
+        for k, v in pairs(v) do
+            DEFAULT_CHAT_FRAME:AddMessage(k)
+        end
+    end
 end
-ManualQuestFinish(4641)
-
 -- End of storing completed Quests for wow 1.12 workaround
 
 
@@ -848,9 +847,6 @@ local modelIdAnimLength = {                 -- If anims other than "talk" are us
     ["character/troll/male/trollmale_npc"]                      = {id = 1022938,    animLength = { [60] = 2.500, [1] = 0 },},
     ["character/tuskarr/male/tuskarrmale"]                      = {id = 122738,     animLength = { [60] = 3.000, [1] = 0 },},
     ["character/vrykul/male/vrykulmale"]                        = {id = 122815,     animLength = { [60] = 3.600, [1] = 0 },},
-    ["character/scourge/female/scourgefemale"]                  = {id = 997378,     animLength = { [60] = 0, [1] = 0 },},
-    ["character/goblin/female/goblinfemale"]                    = {id = 119369,     animLength = { [60] = 4.667, [1] = 0 },},
-    ["character/goblin/male/goblinmale"]                        = {id = 119376,     animLength = { [60] = 4.667, [1] = 0 },},
 }
 
 local function formatPath(inputString)
@@ -1551,3 +1547,31 @@ end
 for index, QuestionButton in ipairs(QuestionButtons) do
     QuestionButton:Hide()
 end
+--ManualQuestFinish(4641)                                                         -- for testing
+
+-- WoW 1.12 Code
+function StoryExtendedEventsVanilla_OnEvent(...)
+    if(event == "ADDON_LOADED" and arg1 == "StoryExtended") then
+        _G["StoryExtendedDB"] = StoryExtendedDB or {}
+        DEFAULT_CHAT_FRAME:AddMessage("Create StoryExtendeDB")
+    elseif(event == "PLAYER_LOGOUT" and arg1 == "StoryExtended") then
+    end
+end
+-- New WoW Code
+function StoryExtendedEventsCurrent_OnEvent(self, event, addonName)
+    if(event == "ADDON_LOADED" and addonName == "StoryExtended") then
+        _G["StoryExtendedDB"] = StoryExtendedDB or {}
+        print("Create StoryExtendeDB")
+    elseif(event == "PLAYER_LOGOUT" and addon == "StoryExtended") then
+    end
+end
+
+CreateFrame("Frame", "StoryExtendedEvents")
+StoryExtendedEvents:RegisterEvent("ADDON_LOADED");
+StoryExtendedEvents:RegisterEvent("PLAYER_LOGOUT");
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    StoryExtendedEvents:SetScript("OnEvent", StoryExtendedEventsVanilla_OnEvent);
+else
+    StoryExtendedEvents:SetScript("OnEvent", StoryExtendedEventsCurrent_OnEvent);
+end
+StoryExtendedEvents:Hide();
