@@ -632,6 +632,12 @@ DialogueFrame:SetScript("OnHide", function(self)                            -- S
     TalkStoryButton:Show()
 end)
 
+local SpeakerName = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+SpeakerName:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", -120, 5)
+SpeakerName:SetPoint("TOPRIGHT", DialogueFrame, "TOPRIGHT", -600, 5)
+SpeakerName:SetJustifyH("CENTER")
+SpeakerName:SetFont(SpeakerName:GetFont(), 18)
+
 -- Create a text label and set its properties
 local DialogueText = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 DialogueText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
@@ -1244,6 +1250,7 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
         end
     end
     DialogueText:SetText(CurrentDialogue.Text)                                              -- Set the dialogue text
+    SpeakerName:SetText(CurrentDialogue.Name)
 
     if animateNpcPortrait == true and NotNPC == false then                                  -- Can be toggled in the options menu
         local animToPlay = 60                                                               -- hardcoded to talk emote (60)
