@@ -36,6 +36,7 @@ local model
 local SavedDialogueFrames
 local SavedQuestionFrames
 local SavedTalkingHeadFrames
+local SpeakerNameFontSize = 18
 
 -- Helper Functions from AI_VoiceOver by MrThinger
 --DEFAULT_CHAT_FRAME:AddMessage()
@@ -647,8 +648,15 @@ local function isInNameList(name)
 end
 
 -- Hide the UI (if the option is set)
-local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
-        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
+local hideUiList
+local hiddenUiList = {}
+if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    hideUiList = {Minimap, ChatFrame1, MainMenuBar, PlayerFrame, TargetFrame, MultiBarBottomLeft, MultiBarBottomRight, MultiBarRight, MultiBarLeft, 
+                PartyMemberFrame1, PartyMemberFrame2, PartyMemberFrame3, PartyMemberFrame4, BuffFrame, QuestWatchFrame, WatchFrame, DurabilityFrame, }
+else
+    hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
+            VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
+end
 function HideUI_Toggle()
 	if (UIParent:IsShown()) then
 		UIParent:Hide()
@@ -657,13 +665,15 @@ function HideUI_Toggle()
 	end
 end
 local function HideUI()
+    hiddenUiList = {}
     TalkStoryButton:Hide()
     if HideUIOption == true then
+        local count = 0
         for i, v in ipairs(hideUiList) do
+            count = count + 1
             if v and v:IsShown() then
                 v:Hide()
-            else
-                v:Show()
+                table.insert(hiddenUiList, count, v)
             end
         end
     end
@@ -672,11 +682,17 @@ end
 local function ShowUI()
     TalkStoryButton:Show()
     if HideUIOption == true then
-        for i, v in ipairs(hideUiList) do
-            if v and v:IsShown() then
-                v:Hide()
-            else
-                v:Show()
+        for i, v in ipairs(hiddenUiList) do
+            DEFAULT_CHAT_FRAME:AddMessage("test")
+            if v and v:IsVisible() then
+                if v == TargetFrame then
+                    if UnitExists("target") then
+                        v:Show()
+                    end
+                else
+                    DEFAULT_CHAT_FRAME:AddMessage("hi")
+                    v:Show()
+                end
             end
         end
     end
@@ -726,11 +742,15 @@ DialogueFrame:SetScript("OnHide", function(self)                            -- S
     TalkStoryButton:Show()
 end)
 
-local SpeakerName = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-SpeakerName:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", -120, 5)
-SpeakerName:SetPoint("TOPRIGHT", DialogueFrame, "TOPRIGHT", -600, 5)
+local SpeakerName
+if SpeakerName == nil or not SpeakerName:IsObjectType("FontString") then
+    SpeakerName = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")      -- sensible. Otherwise the name would be stuck to the main
+end
+SpeakerName:ClearAllPoints()
+SpeakerName:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", -20, 15)
+SpeakerName:SetPoint("TOPRIGHT", DialogueFrame, "TOPRIGHT", -500, 15)
 SpeakerName:SetJustifyH("CENTER")
-SpeakerName:SetFont(SpeakerName:GetFont(), 18)
+SpeakerName:SetFont(SpeakerName:GetFont(), SpeakerNameFontSize)
 
 -- Create a text label and set its properties
 local DialogueText = DialogueFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -1089,11 +1109,14 @@ local function createTalkingHead()                                      -- The f
 
     -- Create SpeakerName text at the portrait if it's activated 
     if showNpcPortrait == true then                                                         -- To make dragging the different frame elements more
-        SpeakerName = talkingHead:CreateFontString(nil, "ARTWORK", "GameFontNormal")      -- sensible. Otherwise the name would be stuck to the main
+        if SpeakerName == nil or not SpeakerName:IsObjectType("FontString") then
+            SpeakerName = talkingHead:CreateFontString(nil, "ARTWORK", "GameFontNormal")      -- sensible. Otherwise the name would be stuck to the main
+        end
+        SpeakerName:ClearAllPoints()
         SpeakerName:SetPoint("TOPLEFT", talkingHead, "TOPLEFT", 0, 15)                  -- dialogue frame when dragging it around
         SpeakerName:SetPoint("TOPRIGHT", talkingHead, "TOPRIGHT", 0, 15)
         SpeakerName:SetJustifyH("CENTER")
-        SpeakerName:SetFont(SpeakerName:GetFont(), 18)
+        SpeakerName:SetFont(SpeakerName:GetFont(), SpeakerNameFontSize)
     end
     -- Setup model and model window
     model:SetPoint("CENTER", talkingHead, "CENTER", 0, -.5)             -- Center the model on the talkingHead frame (which holds our border and background)
@@ -1105,11 +1128,11 @@ local function createTalkingHead()                                      -- The f
     model:SetPosition(0, 0, 0)
     -- WoW 1.12 settings
     if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-        model:SetRotation(math.rad(10))                         -- Rotation seems to be the only setting working before full model initialisation
+        model:SetRotation(math.rad(5))                         -- Rotation seems to be the only setting working before full model initialisation
         local function OnUpdate(frame, elapsed)                 -- Need to wait for model init before we can set the other model settings
-            if HasModelLoaded(model) then                       -- custom function if model ID is valid and not the default model    
-                model:SetModelScale(3.5)                        -- Setting size and...
-                model:SetPosition(0, 0, -4)                     -- setting Position to get a portrait close up shot of the model --(0,0,-2.8)
+            if HasModelLoaded(model) then                       -- custom function if model ID is valid and not the default model
+                model:SetModelScale(1)                          -- Setting size and...
+                model:SetCamera(0)                              -- Camera
                 talkingHead:SetScript("OnUpdate", nil)          -- after setting our desired "camera" settings stop the OnUpdate
             end
         end
@@ -1364,8 +1387,22 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
     end
     DialogueText:SetText(CurrentDialogue.Text)                                              -- Set the dialogue text
     SpeakerName:SetText(CurrentDialogue.Name)
+    if string.len(CurrentDialogue.Name) >= 12 then                       -- Resize the text if the player dialogue choice is too long
+        local maxLength = 12
+        local textLength = string.len(CurrentDialogue.Name)
+        local textSizeModifier = maxLength / textLength
+        local fontSize = SpeakerNameFontSize * textSizeModifier
+        --local SpeakerNameText = SpeakerName:GetFontString()
+        SpeakerName:SetFont(SpeakerName:GetFont(), fontSize)
+    else
+        --local SpeakerNameText = SpeakerName:GetFontString()
+        SpeakerName:SetFont(SpeakerName:GetFont(), SpeakerNameFontSize)
+    end 
 
-    if animateNpcPortrait == true and NotNPC == false then                                  -- Can be toggled in the options menu
+
+    
+
+    if animateNpcPortrait == true and showNpcPortrait == true and NotNPC == false then                                  -- Can be toggled in the options menu
         local animToPlay = 60                                                               -- hardcoded to talk emote (60)
         local animLoops = math.ceil(string.len(CurrentDialogue.Text) / 40)                  --calculate animLoops from dialogue text length  
         playAnimation(animToPlay,animLoops)                                                 -- play the anim (only talk supported atm), second input is the loop counter
@@ -1543,9 +1580,6 @@ local function chooseDatabase(targetName)
         for key, value in pairs(checkDialogues) do                                          -- Loop through the dialogue database
             -- Workaround for wow 1.12
             count = 0                                                                       -- reset iteration every loop
-            for key, value in pairs(foundNpcDialogues) do                                   -- loop through all the eligible found NPC Dialogues
-            count = count + 1                                                               -- count up for every found eligible NPC dialogue
-            end
             if (targetName == checkDialogues[key].Name and checkDialogues[key].Greeting == "true") then     -- if the target name is in the DB and its greeting is set to true
                 internalConditionSuccess = StartConditionCheck(targetName, checkDialogues[key].ConditionType, checkDialogues[key].ConditionValue)   -- do condition check
                 if (internalConditionSuccess == true) then                                  -- if the condition Check is successful 
@@ -1554,8 +1588,12 @@ local function chooseDatabase(targetName)
                     conditionSuccess = true                                                 -- set conditionSuccess to true
                 end                                                                         -- Will always return the dialogue with the highest ID which condition is true
             end
+            for key, value in pairs(foundNpcDialogues) do                                   -- loop through all the eligible found NPC Dialogues
+                count = count + 1                                                               -- count up for every found eligible NPC dialogue
+            end
         end
         if (foundNpcDialogues ~= nil and count > 0) then                                    -- if a possible dialogue was found
+            DEFAULT_CHAT_FRAME:AddMessage("success?")
             return dialogueData, conditionSuccess, addonName                                -- return its data
         end
     end
