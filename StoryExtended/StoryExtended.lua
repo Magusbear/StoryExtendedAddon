@@ -31,6 +31,11 @@ local StoryExtendedLDB
 local showMinimapBtn = true
 local AceTimer
 local ManualQuestFinish
+local talkingHead                                                                           -- have to declare outside of the if statement
+local model
+local SavedDialogueFrames
+local SavedQuestionFrames
+local SavedTalkingHeadFrames
 
 -- Helper Functions from AI_VoiceOver by MrThinger
 --DEFAULT_CHAT_FRAME:AddMessage()
@@ -136,7 +141,9 @@ function StoryExtended:OnEnable()
             showNpcPortraitOption = true,                                               -- show a 3D portrait of NPC
             animateNpcPortraitOption = true,                                            -- Play emotes with the 3D portrait
             toggleMiniMap = false,
-            --hide = false.
+            SavedDialogueFrames = {"BOTTOM", "UIParent", "BOTTOM", 0, 100},
+            SavedQuestionFrames = {"RIGHT", "UIParent", "RIGHT", -100, -100},
+            SavedTalkingHeadFrames = {"BOTTOM", "UIParent", "BOTTOM", -365, 110}
         },
         }
 
@@ -161,6 +168,17 @@ function StoryExtended:OnEnable()
                     set = function (info, value)
                         StoryExtended.db.profile.HideUIOption = value
                         HideUIOption = StoryExtended.db.profile.HideUIOption
+                        if HideUIOption == true then
+                            if SavedDialogueFrames[5] == 100 then
+                                DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+                            else
+                                SavedDialogueFrames[2] = UIParent
+                                DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+                            end
+                        else
+                            SavedDialogueFrames[2] = UIParent
+                            DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+                        end
                     end,
                     get = function (info) return StoryExtended.db.profile.HideUIOption end,
                 },
@@ -176,6 +194,8 @@ function StoryExtended:OnEnable()
                         QuestionFrame:SetMovable(letMoveFrames)
                         DialogueFrame:EnableMouse(letMoveFrames)
                         QuestionFrame:EnableMouse(letMoveFrames)
+                        talkingHead:SetMovable(letMoveFrames)
+                        talkingHead:EnableMouse(letMoveFrames)
                     end,
                     get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
                 },
@@ -257,6 +277,34 @@ function StoryExtended:OnEnable()
         playVoices = StoryExtended.db.profile.playNpcVoiceOver
         showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
         animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+        SavedDialogueFrames = StoryExtended.db.profile.SavedDialogueFrames
+        SavedTalkingHeadFrames = StoryExtended.db.profile.SavedTalkingHeadFrames
+        SavedQuestionFrames = StoryExtended.db.profile.SavedQuestionFrames
+
+        DialogueFrame:SetMovable(letMoveFrames)
+        DialogueFrame:EnableMouse(letMoveFrames)
+        talkingHead:SetMovable(letMoveFrames)
+        talkingHead:EnableMouse(letMoveFrames)
+        QuestionFrame:SetMovable(letMoveFrames)
+        QuestionFrame:EnableMouse(letMoveFrames)
+
+        DialogueFrame:ClearAllPoints()
+        if HideUIOption == true then
+            DEFAULT_CHAT_FRAME:AddMessage("DB function")
+            if SavedDialogueFrames[5] == 100 then
+                DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+            else
+                SavedDialogueFrames[2] = UIParent
+                DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+            end
+        else
+            SavedDialogueFrames[2] = UIParent
+            DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+        end
+        QuestionFrame:ClearAllPoints()
+        SavedQuestionFrames[2] = UIParent
+        QuestionFrame:SetPoint(unpack(SavedQuestionFrames))
+
         SE_ToggleMinimapBtn()                                                                                       -- toggle minimap button
     -- New WoW Code
     else
@@ -268,6 +316,9 @@ function StoryExtended:OnEnable()
             showNpcPortraitOption = true,                                               -- show a 3D portrait of NPC
             animateNpcPortraitOption = true,                                            -- Play emotes with the 3D portrait
             toggleMiniMap = false,
+            SavedDialogueFrames = {"BOTTOM", "UIParent", "BOTTOM", 0, 100},
+            SavedQuestionFrames = {"RIGHT", "UIParent", "RIGHT", -100, -100},
+            SavedTalkingHeadFrames = {"BOTTOM", "UIParent", "BOTTOM", -365, 110}
             --hide = false.
         },
         }
@@ -287,6 +338,17 @@ function StoryExtended:OnEnable()
                 set = function (info, value)
                     StoryExtended.db.profile.HideUIOption = value
                     HideUIOption = StoryExtended.db.profile.HideUIOption
+                    if HideUIOption == true then
+                        if SavedDialogueFrames[5] == 100 then
+                            DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+                        else
+                            SavedDialogueFrames[2] = UIParent
+                            DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+                        end
+                    else
+                        SavedDialogueFrames[2] = UIParent
+                        DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+                    end
                 end,
                 get = function (info) return StoryExtended.db.profile.HideUIOption end,
             },
@@ -302,6 +364,9 @@ function StoryExtended:OnEnable()
                     QuestionFrame:SetMovable(letMoveFrames)
                     DialogueFrame:EnableMouse(letMoveFrames)
                     QuestionFrame:EnableMouse(letMoveFrames)
+                    talkingHead:SetMovable(letMoveFrames)
+                    talkingHead:EnableMouse(letMoveFrames)
+                    DialogueFrame:ClearAllPoints()
                 end,
                 get = function (info) return StoryExtended.db.profile.lockDialogueFrames end,
             },
@@ -357,6 +422,34 @@ function StoryExtended:OnEnable()
         playVoices = StoryExtended.db.profile.playNpcVoiceOver
         showNpcPortrait = StoryExtended.db.profile.showNpcPortraitOption
         animateNpcPortrait = StoryExtended.db.profile.animateNpcPortraitOption
+        SavedDialogueFrames = StoryExtended.db.profile.SavedDialogueFrames
+        SavedTalkingHeadFrames = StoryExtended.db.profile.SavedTalkingHeadFrames
+        SavedQuestionFrames = StoryExtended.db.profile.SavedQuestionFrames
+
+        DialogueFrame:SetMovable(letMoveFrames)
+        DialogueFrame:EnableMouse(letMoveFrames)
+        talkingHead:SetMovable(letMoveFrames)
+        talkingHead:EnableMouse(letMoveFrames)
+        QuestionFrame:SetMovable(letMoveFrames)
+        QuestionFrame:EnableMouse(letMoveFrames)
+
+        DialogueFrame:ClearAllPoints()
+        if HideUIOption == true then
+            DEFAULT_CHAT_FRAME:AddMessage("DB function")
+            if SavedDialogueFrames[5] == 100 then
+                DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+            else
+                SavedDialogueFrames[2] = UIParent
+                DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+            end
+        else
+            SavedDialogueFrames[2] = UIParent
+            DialogueFrame:SetPoint(unpack(SavedDialogueFrames))
+        end
+
+        QuestionFrame:ClearAllPoints()
+        SavedQuestionFrames[2] = UIParent
+        QuestionFrame:SetPoint(unpack(SavedQuestionFrames))
     end
 end
 
@@ -554,45 +647,82 @@ local function isInNameList(name)
 end
 
 -- Hide the UI (if the option is set)
+function HideUI_Toggle()
+	if (UIParent:IsShown()) then
+		UIParent:Hide()
+	else
+		UIParent:Show()	
+	end
+end
 local function HideUI()
     TalkStoryButton:Hide()
     if HideUIOption == true then
-        MinimapCluster:Hide()
-        PlayerFrame:Hide()
-        TargetFrame:Hide()
-        MainMenuBarArtFrame:Hide()
-        MainMenuExpBar:Hide()
-        MultiCastActionBarFrame:Hide()
-        ChatFrame1:Hide()
-        TotemFrame:Hide()
-        VerticalMultiBarsContainer:Hide()
-        MultiBarLeft:Hide()
-        ChatFrameMenuButton:Hide()
-        ChatFrameChannelButton:Hide()
-        WatchFrame:Hide()
-        StanceBarFrame:Hide()
+        local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
+        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
+
+        for i, v in ipairs(hideUiList) do
+            if v and v:IsShown() then
+                v:Hide()
+            else
+                v:Show()
+            end
+        end
+
+        -- MinimapCluster:Hide()
+        -- PlayerFrame:Hide()
+        -- TargetFrame:Hide()
+        -- MainMenuBarArtFrame:Hide()
+        -- MainMenuExpBar:Hide()
+        -- if MultiCastActionBarFrame then
+        --     MultiCastActionBarFrame:Hide()
+        -- end
+        -- ChatFrame1:Hide()
+        -- if TotemFrame then
+        --     TotemFrame:Hide()
+        -- end
+        -- VerticalMultiBarsContainer:Hide()
+        -- MultiBarLeft:Hide()
+        -- ChatFrameMenuButton:Hide()
+        -- ChatFrameChannelButton:Hide()
+        -- WatchFrame:Hide()
+        -- StanceBarFrame:Hide()
     end
 end
 -- function to show the UI again after having hidden it (if the option is set)
 local function ShowUI()
     TalkStoryButton:Show()
     if HideUIOption == true then
-        MinimapCluster:Show()
-        PlayerFrame:Show()
-        if UnitName("target") ~= nil then
-            TargetFrame:Show()
+        local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
+        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
+
+        for i, v in ipairs(hideUiList) do
+            if v and v:IsShown() then
+                v:Hide()
+            else
+                v:Show()
+            end
         end
-        MainMenuBarArtFrame:Show()
-        MainMenuExpBar:Show()
-        MultiCastActionBarFrame:Show()
-        ChatFrame1:Show()
-        TotemFrame:Show()
-        VerticalMultiBarsContainer:Show()
-        MultiBarLeft:Show()
-        ChatFrameMenuButton:Show()
-        ChatFrameChannelButton:Show()
-        WatchFrame:Show()
-        StanceBarFrame:Show()
+
+        -- MinimapCluster:Show()
+        -- PlayerFrame:Show()
+        -- if UnitName("target") ~= nil then
+        --     TargetFrame:Show()
+        -- end
+        -- MainMenuBarArtFrame:Show()
+        -- MainMenuExpBar:Show()
+        -- if MultiCastActionBarFrame then
+        --     MultiCastActionBarFrame:Show()
+        -- end
+        -- ChatFrame1:Show()
+        -- if TotemFrame then
+        --     TotemFrame:Show()
+        -- end
+        -- VerticalMultiBarsContainer:Show()
+        -- MultiBarLeft:Show()
+        -- ChatFrameMenuButton:Show()
+        -- ChatFrameChannelButton:Show()
+        -- WatchFrame:Show()
+        -- StanceBarFrame:Show()
     end
 end
 
@@ -611,10 +741,13 @@ end
 
 DialogueFrame:SetWidth(600)
 DialogueFrame:SetHeight(150)
-DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 100)
+
 if HideUIOption == true then
     DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
+else
+    DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 100)
 end
+
 DialogueFrame:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -622,11 +755,17 @@ DialogueFrame:SetBackdrop({
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
 })
 DialogueFrame:SetBackdropColor(0, 0, 0, 1)
-DialogueFrame:SetMovable(letMoveFrames)
-DialogueFrame:EnableMouse(letMoveFrames)
+DialogueFrame:SetMovable(true)
+DialogueFrame:EnableMouse(true)
 DialogueFrame:RegisterForDrag("LeftButton")
-DialogueFrame:SetScript("OnDragStart", DialogueFrame.StartMoving)
-DialogueFrame:SetScript("OnDragStop", DialogueFrame.StopMovingOrSizing)
+DialogueFrame:SetScript("OnDragStart", function() DialogueFrame:StartMoving() end)
+DialogueFrame:SetScript("OnDragStop", function() DialogueFrame:StopMovingOrSizing() 
+    SavedDialogueFrames = {DialogueFrame:GetPoint()}
+    SavedDialogueFrames[2] = ""
+    SavedDialogueFrames[6] = "UIParent"
+    StoryExtended.db.profile.SavedDialogueFrames = SavedDialogueFrames
+    DEFAULT_CHAT_FRAME:AddMessage("Saved Position")
+end)
 tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
 DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
     TalkStoryButton:Show()
@@ -668,8 +807,13 @@ QuestionFrame:SetBackdropColor(0, 0, 0, 1)
 QuestionFrame:SetMovable(letMoveFrames)
 QuestionFrame:EnableMouse(letMoveFrames)
 QuestionFrame:RegisterForDrag("LeftButton")
-QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
-QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
+QuestionFrame:SetScript("OnDragStart", function() QuestionFrame:StartMoving() end)
+QuestionFrame:SetScript("OnDragStop", function() QuestionFrame:StopMovingOrSizing() 
+    SavedQuestionFrames = {QuestionFrame:GetPoint()}
+    SavedQuestionFrames[2] = ""
+    SavedQuestionFrames[6] = "UIParent"
+    StoryExtended.db.profile.SavedQuestionFrames = SavedQuestionFrames
+end)
 tinsert(UISpecialFrames, "QuestionFrame")
 
 -- Create a text label and set its properties
@@ -678,29 +822,6 @@ QuestionText:SetPoint("CENTER", QuestionFrame, "CENTER", 0, 0)
 QuestionText:SetJustifyH("CENTER")
 QuestionText:SetFont(QuestionText:GetFont(), 20)
 
-QuestionFrame:SetWidth(300)
-QuestionFrame:SetHeight(200)
-QuestionFrame:SetPoint("RIGHT", UIParent, "RIGHT", -100, -100)
-QuestionFrame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
-})
-QuestionFrame:SetBackdropColor(0, 0, 0, 1)
-QuestionFrame:SetMovable(letMoveFrames)
-QuestionFrame:EnableMouse(letMoveFrames)
-QuestionFrame:RegisterForDrag("LeftButton")
-QuestionFrame:SetScript("OnDragStart", QuestionFrame.StartMoving)
-QuestionFrame:SetScript("OnDragStop", QuestionFrame.StopMovingOrSizing)
-tinsert(UISpecialFrames, "QuestionFrame")
-
--- Create a text label and set its properties
-local QuestionText = QuestionFrame:CreateFontString(nil, "ARTWORK", "GameFontNormal", "BackdropTemplate")
-QuestionText:SetPoint("TOPLEFT", DialogueFrame, "TOPLEFT", 16, -16)
-QuestionText:SetPoint("BOTTOMRIGHT", DialogueFrame, "BOTTOMRIGHT", -16, 16)
-QuestionText:SetJustifyH("LEFT")
-QuestionText:SetFont(QuestionText:GetFont(), 20)
 
 
 -- Create 4 question buttons within the Question Frame                              -- Question Button might be a bit confusing as a name
@@ -760,8 +881,7 @@ end
 
 -- NPC 3D Portrait frame creation
 -- the following code creates the 3D portrait and drives its animations
-local talkingHead                                                                           -- have to declare outside of the if statement
-local model                                                                                 -- have to declare outside of the if statement
+
 -- WoW 1.12 code
 if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     talkingHead = CreateFrame("Frame", "SETalkingHeadFrame", UIParent)                      -- WoW 1.12 hasnt got a "BackdropTemplate"
@@ -970,7 +1090,27 @@ local function createTalkingHead()                                      -- The f
     -- Create the frame                                                 --
     talkingHead:SetWidth(128)                                           -- Width 
     talkingHead:SetHeight(128)                                          -- and height of the parent frame for the 3d model
-    talkingHead:SetPoint("BOTTOM", UIParent, "BOTTOM", -360, 110)       -- Put it right next to the dialogue frame
+
+    
+
+
+    if SavedTalkingHeadFrames then
+        talkingHead:ClearAllPoints()
+
+        if HideUIOption == true then
+            if SavedTalkingHeadFrames[5] == 110 then
+                talkingHead:SetPoint("BOTTOM", UIParent, "BOTTOM", -365, 60)
+            else
+                SavedTalkingHeadFrames[2] = UIParent
+                talkingHead:SetPoint(unpack(SavedTalkingHeadFrames))
+            end
+        else
+            SavedTalkingHeadFrames[2] = UIParent
+            talkingHead:SetPoint(unpack(SavedTalkingHeadFrames))
+        end
+    else
+        talkingHead:SetPoint("BOTTOM", UIParent, "BOTTOM", -365, 110)       -- Put it right next to the dialogue frame
+    end
 
     -- Set the background and border of the frame
     talkingHead:SetBackdrop({                                           -- Sets the background and border for the parent frame of the 3d model
@@ -981,11 +1121,29 @@ local function createTalkingHead()                                      -- The f
     })                                                                  -- thoughts for later
     talkingHead:SetBackdropBorderColor(1, 1, 1)                         -- border color
     talkingHead:SetBackdropColor(0, 0, 0, 0.5)                          -- background color
+    talkingHead:SetMovable(letMoveFrames)
+    talkingHead:EnableMouse(letMoveFrames)
+    talkingHead:RegisterForDrag("LeftButton")
+    talkingHead:SetScript("OnDragStart", function() talkingHead:StartMoving() end)
+    talkingHead:SetScript("OnDragStop", function() talkingHead:StopMovingOrSizing() 
+        SavedTalkingHeadFrames = {talkingHead:GetPoint()}
+        SavedTalkingHeadFrames[2] = ""
+        SavedTalkingHeadFrames[6] = "UIParent"
+        StoryExtended.db.profile.SavedTalkingHeadFrames = SavedTalkingHeadFrames
+    end)
 
+    -- Create SpeakerName text at the portrait if it's activated 
+    if showNpcPortrait == true then                                                         -- To make dragging the different frame elements more
+        SpeakerName = talkingHead:CreateFontString(nil, "ARTWORK", "GameFontNormal")      -- sensible. Otherwise the name would be stuck to the main
+        SpeakerName:SetPoint("TOPLEFT", talkingHead, "TOPLEFT", 0, 15)                  -- dialogue frame when dragging it around
+        SpeakerName:SetPoint("TOPRIGHT", talkingHead, "TOPRIGHT", 0, 15)
+        SpeakerName:SetJustifyH("CENTER")
+        SpeakerName:SetFont(SpeakerName:GetFont(), 18)
+    end
     -- Setup model and model window
-    model:SetPoint("CENTER", talkingHead, "CENTER")             -- Center the model on the talkingHead frame (which holds our border and background)
-    model:SetWidth(120)                                         -- set the model frames size to slightly smaller than the border frame...
-    model:SetHeight(120)                                        -- so that it does not go over the border texture
+    model:SetPoint("CENTER", talkingHead, "CENTER", 0, -.5)             -- Center the model on the talkingHead frame (which holds our border and background)
+    model:SetWidth(118)                                         -- set the model frames size to slightly smaller than the border frame...
+    model:SetHeight(117)                                        -- so that it does not go over the border texture
     model:SetUnit("target")                                     -- Set the model to that of our target npc
     -- placeholder code goes here!                              -- if we don't have a target npc, we use a placeholder
     model:SetModelScale(1)
