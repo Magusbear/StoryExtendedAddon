@@ -647,6 +647,8 @@ local function isInNameList(name)
 end
 
 -- Hide the UI (if the option is set)
+local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
+        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
 function HideUI_Toggle()
 	if (UIParent:IsShown()) then
 		UIParent:Hide()
@@ -657,9 +659,6 @@ end
 local function HideUI()
     TalkStoryButton:Hide()
     if HideUIOption == true then
-        local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
-        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
-
         for i, v in ipairs(hideUiList) do
             if v and v:IsShown() then
                 v:Hide()
@@ -667,34 +666,12 @@ local function HideUI()
                 v:Show()
             end
         end
-
-        -- MinimapCluster:Hide()
-        -- PlayerFrame:Hide()
-        -- TargetFrame:Hide()
-        -- MainMenuBarArtFrame:Hide()
-        -- MainMenuExpBar:Hide()
-        -- if MultiCastActionBarFrame then
-        --     MultiCastActionBarFrame:Hide()
-        -- end
-        -- ChatFrame1:Hide()
-        -- if TotemFrame then
-        --     TotemFrame:Hide()
-        -- end
-        -- VerticalMultiBarsContainer:Hide()
-        -- MultiBarLeft:Hide()
-        -- ChatFrameMenuButton:Hide()
-        -- ChatFrameChannelButton:Hide()
-        -- WatchFrame:Hide()
-        -- StanceBarFrame:Hide()
     end
 end
 -- function to show the UI again after having hidden it (if the option is set)
 local function ShowUI()
     TalkStoryButton:Show()
     if HideUIOption == true then
-        local hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
-        VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
-
         for i, v in ipairs(hideUiList) do
             if v and v:IsShown() then
                 v:Hide()
@@ -702,27 +679,6 @@ local function ShowUI()
                 v:Show()
             end
         end
-
-        -- MinimapCluster:Show()
-        -- PlayerFrame:Show()
-        -- if UnitName("target") ~= nil then
-        --     TargetFrame:Show()
-        -- end
-        -- MainMenuBarArtFrame:Show()
-        -- MainMenuExpBar:Show()
-        -- if MultiCastActionBarFrame then
-        --     MultiCastActionBarFrame:Show()
-        -- end
-        -- ChatFrame1:Show()
-        -- if TotemFrame then
-        --     TotemFrame:Show()
-        -- end
-        -- VerticalMultiBarsContainer:Show()
-        -- MultiBarLeft:Show()
-        -- ChatFrameMenuButton:Show()
-        -- ChatFrameChannelButton:Show()
-        -- WatchFrame:Show()
-        -- StanceBarFrame:Show()
     end
 end
 
@@ -730,7 +686,6 @@ end
 --
 -- Create the frame itself with graphics
 local DialogueFrame                                                                 -- declared outside of if function
-
 -- WoW 1.12 code
 if string.sub(CLIENT_VERSION, 1, 2) == "1." then
     DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent)
@@ -1238,8 +1193,8 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
                         
             -- WoW 1.12 Code             -- WoW 1.12 does not have the SetMask function
             if string.sub(CLIENT_VERSION, 1, 2) == "1." then
-                targetIcon:SetDrawLayer("BACKGROUND", 1)
-                targetIconBorder:SetDrawLayer("BORDER", 2)
+                targetIcon:SetDrawLayer("ARTWORK", 1)
+                targetIconBorder:SetDrawLayer("ARTWORK", 2)
             -- New WoW Code
             else
                 targetIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask")              -- set the mask texture to make the icon round 
