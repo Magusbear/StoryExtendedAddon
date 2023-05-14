@@ -683,8 +683,7 @@ local function ShowUI()
     TalkStoryButton:Show()
     if HideUIOption == true then
         for i, v in ipairs(hiddenUiList) do
-            DEFAULT_CHAT_FRAME:AddMessage("test")
-            if v and v:IsVisible() then
+            if v and not v:IsShown() then
                 if v == TargetFrame then
                     if UnitExists("target") then
                         v:Show()
