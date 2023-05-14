@@ -1,7 +1,23 @@
 setfenv(1, StoryExtendedEnv)
-local CLIENT_VERSION, BUILD = GetBuildInfo()
 
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+-- Version check taken from AI_VoiceOver by MrThinger
+Version = {}
+
+local CLIENT_VERSION, BUILD, _, INTERFACE_VERSION = GetBuildInfo()
+
+Version.Client                  = CLIENT_VERSION
+Version.Build                   = BUILD
+Version.Interface               = INTERFACE_VERSION or 0
+Version.IsAnyLegacy             = WOW_PROJECT_ID == nil or nil
+Version.IsLegacyVanilla         = Version.IsAnyLegacy and Version.Interface ==     0 or nil
+Version.IsLegacyWrath           = Version.IsAnyLegacy and Version.Interface == 30300 or nil
+Version.IsAnyRetail             = not Version.IsAnyLegacy or nil
+Version.IsRetailVanilla         = Version.IsAnyRetail and WOW_PROJECT_ID == WOW_PROJECT_CLASSIC or nil
+Version.IsRetailBurningCrusade  = Version.IsAnyRetail and WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC or nil
+Version.IsRetailWrath           = Version.IsAnyRetail and WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC or nil
+Version.IsRetailMainline        = Version.IsAnyRetail and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE or nil
+
+if Version.IsAnyLegacy then
     StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0", "AceTimer-3.0", "AceConfig-3.0")
 else
     StoryExtended = LibStub("AceAddon-3.0"):NewAddon("StoryExtended", "AceConsole-3.0")
@@ -64,7 +80,7 @@ if not string.match then
 end
 -- ^^^ Helper Functions from AI_VoiceOver by MrThinger
 
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     -- Client version is 1.12 or below
 else
     -- Client version is higher than 1.12
@@ -108,7 +124,7 @@ end
 function StoryExtended:OnEnable()
 
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         local AceConfigDialog = LibStub("AceConfigDialog-3.0")
         local AceConfigRegistry = LibStub("AceConfigRegistry-3.0")
 
@@ -560,7 +576,7 @@ end
 
 -- Mark the quest as finished in the SavedVariables
 function markQuestFinished(questId)
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         DEFAULT_CHAT_FRAME:AddMessage("Mark quest finished")
         if not StoryExtendedDB[99999] then                                          -- The table keys are numericals so I chose a high number for the QuestList
             StoryExtendedDB[99999] = {}                                             -- Create the table if it doesn't exist
@@ -570,7 +586,7 @@ function markQuestFinished(questId)
 end
 
 -- Save the original QuestRewardCompleteButton function into a variable for later use
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     local originalQuestRewardCompleteButton_OnClick
     originalQuestRewardCompleteButton_OnClick = QuestRewardCompleteButton_OnClick
 
@@ -605,7 +621,7 @@ end
 -- Create a list of all NPC with dialgue
 local function createNameList()
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         for _, dataAddon in pairs(dialogueDataAddons.registeredDataAddonsOrdered) do               -- Goes through each data addon dialogue DB...
             local dialogueData = dataAddon.GetDialogue                                      -- looks for the namefield and checks if that name...
             local checkDialogues = dialogueData                                             -- is already present in the nameList
@@ -634,7 +650,7 @@ end
 local function isInNameList(name)
     local nameFound = false
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         if string.find(table.concat(nameList, ","), name) then
             nameFound = true
         end
@@ -650,7 +666,7 @@ end
 -- Hide the UI (if the option is set)
 local hideUiList
 local hiddenUiList = {}
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     hideUiList = {Minimap, ChatFrame1, MainMenuBar, PlayerFrame, TargetFrame, MultiBarBottomLeft, MultiBarBottomRight, MultiBarRight, MultiBarLeft, 
                 PartyMemberFrame1, PartyMemberFrame2, PartyMemberFrame3, PartyMemberFrame4, BuffFrame, QuestWatchFrame, WatchFrame, DurabilityFrame, }
 else
@@ -702,7 +718,7 @@ end
 -- Create the frame itself with graphics
 local DialogueFrame                                                                 -- declared outside of if function
 -- WoW 1.12 code
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     DialogueFrame = CreateFrame("Frame", "DialogueFrame", UIParent)
 -- New WoW Code (only difference is the use of "BackdropTemplate" in New WoW)
 else
@@ -762,7 +778,7 @@ DialogueText:SetFont(DialogueText:GetFont(), 20)
 -- Create a question frame for the dialogue questions
 local QuestionFrame                                                                 -- declared outside of if function
 -- WoW 1.12 Code
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     QuestionFrame = CreateFrame("Frame", "QuestionFrame", UIParent)
 -- New WoW Code (only difference is the use of "BackdropTemplate" in New WoW)
 else
@@ -802,7 +818,7 @@ QuestionText:SetFont(QuestionText:GetFont(), 20)
 local QuestionButtons = {}                                                          -- these are the player dialogue choices
 for i = 1, 4 do
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         local QuestionButton = CreateFrame("Button", "QuestionButton"..i, UIParent)
         QuestionButton:SetWidth(QuestionFrame:GetWidth() * 0.93)
         QuestionButton:SetHeight(QuestionFrame:GetHeight() * 0.75 / 4)
@@ -857,7 +873,7 @@ end
 -- the following code creates the 3D portrait and drives its animations
 
 -- WoW 1.12 code
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     talkingHead = CreateFrame("Frame", "SETalkingHeadFrame", UIParent)                      -- WoW 1.12 hasnt got a "BackdropTemplate"
     model = CreateFrame("DressUpModel", "SETalkingHeadModel", talkingHead)                  -- DressUpModel is a special frame that can hold a 3D model
 -- New WoW Code
@@ -958,7 +974,7 @@ end
 
 
 -- WoW 1.12 code override of GetModelFileID that was later introduced
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then                                 -- Found this workaround here: https://github.com/mrthinger/wow-voiceover
+if Version.IsAnyLegacy then                                 -- Found this workaround here: https://github.com/mrthinger/wow-voiceover
     function GetModelFileID()                                                   -- GetModelFileID is a native function in new wow, this replicates it somewhat
         local modelPath = model:GetModel()                                          -- get model string path of portrait model
         if modelPath and type(modelPath) == "string" then                           -- if it exists and is a string
@@ -972,7 +988,7 @@ end
 
 function GetAnimLength(inputAnimId)                                             -- Using a lookup table to get the animLength for the input Animation
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then                             -- 
+    if Version.IsAnyLegacy then                             -- 
         local modelPath = model:GetModel()                                      -- WoW 1.12 has a function to get the model path...
         modelPath = formatPath(modelPath)
         if modelPath == "character/goblin/female/goblinfemale"                  -- Goblins did not have talk anims in WoW 1.12
@@ -999,7 +1015,7 @@ end
 
 local function HasModelLoaded(modelCheck)
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         local modelPath = model:GetModel()                                              -- get model string path of portrait model
         return modelPath and type(modelPath) == "string" and GetModelFileID() ~= 130737 -- is model not nil, is it a string, and is it not ID 130737 (the default model)
     -- END WoW 1.12 Code
@@ -1013,7 +1029,7 @@ end
 function playAnimation(sequenceID, animLoops)                           -- SequenceID = Animation ID, animLoops = number of times the anim loops
                                                                         -- AnimLoops depends on the length of the npc dialogue (not the sound file if it exists)
     -- WoW 1.12 code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         local sequenceDuration = GetAnimLength(sequenceID)*1000         -- Using lookup table to get AnimLength
         local animTimer = 0                                             -- helper var to count how long the anim has played already
         local animLoopCount =  0                                        -- helper var to count how many anims were played
@@ -1126,7 +1142,7 @@ local function createTalkingHead()                                      -- The f
     model:SetModelScale(1)
     model:SetPosition(0, 0, 0)
     -- WoW 1.12 settings
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         model:SetRotation(math.rad(5))                         -- Rotation seems to be the only setting working before full model initialisation
         local function OnUpdate(frame, elapsed)                 -- Need to wait for model init before we can set the other model settings
             if HasModelLoaded(model) then                       -- custom function if model ID is valid and not the default model
@@ -1177,7 +1193,7 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
             DialogueMarkerIcon:SetDrawLayer("BACKGROUND", 1)
             DialogueMarkerBorder = button:CreateTexture(nil, "BORDER")
             -- New WoW Code                                                                         -- WoW 1.12 does not have the SetMask function
-            if string.sub(CLIENT_VERSION, 1, 2) ~= "1." then
+            if Version.IsAnyRetail then
                 DialogueMarkerIcon:SetMask("Interface\\CharacterFrame\\TempPortraitAlphaMask")      -- set the mask texture to make the icon round 
             end
             DialogueMarkerBorder:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
@@ -1192,8 +1208,8 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
 
         -- -- Add texture to target DialogueMarkerFrame
         if not targetIcon then
-            if string.sub(CLIENT_VERSION, 1, 2) == "10" then
-                targetIcon = TargetFrame:CreateTexture(nil, "OVERLAY")
+            if Version.IsRetailMainline then                                                        -- Mainline changed the UI extensively
+                targetIcon = TargetFrame:CreateTexture(nil, "OVERLAY")                              -- These are the new unit frames
             else
                 targetIcon = TargetFrameTextureFrame:CreateTexture(nil, "OVERLAY")
             end
@@ -1203,8 +1219,8 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
             targetIcon:SetHeight(26)
             targetIcon:SetPoint("TOPLEFT", TargetFrame, "TOPLEFT", 170, -10)
             targetIcon:SetVertexColor(1, 1, 1)
-            if string.sub(CLIENT_VERSION, 1, 2) == "10" then
-                targetIconBorder = TargetFrame:CreateTexture(nil, "BORDER")
+            if Version.IsRetailMainline then                                                        -- Mainline changed the UI extensively
+                targetIconBorder = TargetFrame:CreateTexture(nil, "BORDER")                         -- These are the new unit frames
             else
                 targetIconBorder = TargetFrameTextureFrame:CreateTexture(nil, "BORDER")
             end
@@ -1214,7 +1230,7 @@ if UnitExists("target") and UnitClassification("target") == "normal" then
             targetIconBorder:SetPoint("CENTER", targetIcon, "CENTER", 10, -11)
                         
             -- WoW 1.12 Code             -- WoW 1.12 does not have the SetMask function
-            if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+            if Version.IsAnyLegacy then
                 targetIcon:SetDrawLayer("ARTWORK", 1)
                 targetIconBorder:SetDrawLayer("ARTWORK", 2)
             -- New WoW Code
@@ -1257,7 +1273,7 @@ end)
 -- Function to start playing dialogue sound files
 function PlayDialogue(CurrentDialogue, DatabaseName)
     -- WoW 1.12 Code                                                                                -- WoW 1.12 does not have sound handles, the audio can't be stopped
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then                                                 -- without workarounds, which aren't implemented yet
+    if Version.IsAnyLegacy then                                                 -- without workarounds, which aren't implemented yet
         local audioFile = "Interface\\Addons\\"..DatabaseName.."\\audio\\"..CurrentDialogue.Name..CurrentDialogue.id..".mp3"
         PlaySoundFile(audioFile)
     -- New WoW Code                                                                                 -- New WoW can play sound and give it a handle to stop that sound
@@ -1271,7 +1287,7 @@ end
 -- Function to stop playing current dialogue sound file
 function StopDialogue(CurrentDialogue)
     -- WoW 1.12 Code
-    if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+    if Version.IsAnyLegacy then
         -- does nothing in WoW 1.12 atm
     -- New WoW Code
     else
@@ -1297,17 +1313,17 @@ local function StartConditionCheck(targetName, conditionType, conditionValue)   
         return true
 
     -- New WoW Code
-    elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "quest-id"                      -- New WoW Code:
-    and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue))) then                              -- Checking if Quest is finished through Quest ID directly
+    elseif Version.IsAnyRetail and conditionType == "quest-id"                      -- New WoW Code:
+    and C_QuestLog.IsQuestFlaggedCompleted(tonumber(conditionValue)) then                              -- Checking if Quest is finished through Quest ID directly
         return true
 
     -- WoW 1.12 Code
-    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "quest-id"                     -- WoW 1.12 Code:
-    and StoryExtendedDB[99999] and StoryExtendedDB[99999][(tonumber(conditionValue))] == true) then     -- Checking the custom finished Quest table with Quest ID
+    elseif Version.IsAnyLegacy and conditionType == "quest-id"                     -- WoW 1.12 Code:
+    and StoryExtendedDB[99999] and StoryExtendedDB[99999][(tonumber(conditionValue))] == true then     -- Checking the custom finished Quest table with Quest ID
         return true
 
     -- New WoW Code
-    elseif (string.sub(CLIENT_VERSION, 1, 1) > "1" and conditionType == "doFirst") then                 -- New WoW Code:
+    elseif Version.IsAnyRetail and conditionType == "doFirst" then                 -- New WoW Code:
         local npcCheck, npcIdCheck = conditionValue:match("([^,]+),([^,]+)")                            -- Checks the SavedVariables if player has already seen
         local hashedNpcCheck = hashString(npcCheck)                                                     -- this specific dialogue. If so don't show it again
         if(StoryExtendedDB[hashedNpcCheck] ~= nil and StoryExtendedDB[hashedNpcCheck][npcIdCheck] ~= nil-- Works for starting a dialogue, as well as for showing... 
@@ -1319,7 +1335,7 @@ local function StartConditionCheck(targetName, conditionType, conditionValue)   
         end
 
     -- WoW 1.12 Code
-    elseif (string.sub(CLIENT_VERSION, 1, 1) == "1" and conditionType == "doFirst") then                -- WoW 1.12 code
+    elseif Version.IsAnyLegacy and conditionType == "doFirst" then                -- WoW 1.12 code
         local npcCheck, npcIdCheck = string.match(conditionValue, "([^,]+),([^,]+)")                    -- Same as New WoW code except for usage of string.match     
         local hashedNpcCheck = hashString(npcCheck)                                                     -- instead of shorthand match
         if(StoryExtendedDB[hashedNpcCheck] ~= nil 
@@ -1666,7 +1682,7 @@ local function OnZoneChanged()                                                  
     end                                                                                     -- I will change this later
     if foundName then
         -- WoW 1.12 Code
-        if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+        if Version.IsAnyLegacy then
             StoryExtended:ScheduleTimer(function() TalkStoryFunc(subzone) end, 2)          -- Have to use AceTimer in classic to delay the dialogue for a bit
         -- New WoW Code
         else
@@ -1726,7 +1742,7 @@ end
 CreateFrame("Frame", "StoryExtendedEvents")
 StoryExtendedEvents:RegisterEvent("ADDON_LOADED");
 StoryExtendedEvents:RegisterEvent("PLAYER_LOGOUT");
-if string.sub(CLIENT_VERSION, 1, 2) == "1." then
+if Version.IsAnyLegacy then
     StoryExtendedEvents:SetScript("OnEvent", StoryExtendedEventsVanilla_OnEvent);
 else
     StoryExtendedEvents:SetScript("OnEvent", StoryExtendedEventsCurrent_OnEvent);

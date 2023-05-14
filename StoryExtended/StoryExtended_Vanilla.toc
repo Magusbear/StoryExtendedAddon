@@ -1,10 +1,10 @@
-## Interface: 11200
+## Interface: 11403
 ## Title: StoryExtended
 ## Version: 0.1
-## Notes: Adds stories through custom dialogues. 1.12
+## Notes: Adds stories through custom dialogues. Vanilla
 ## SavedVariablesPerCharacter: StoryExtendedDB
 ## SavedVariables: GlobalStoryExtendedDB
 environment.lua
 db\quests.lua
-1.12\embeds.xml
+embeds.xml
 StoryExtended.lua
