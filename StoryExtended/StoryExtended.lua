@@ -278,8 +278,8 @@ function StoryExtended:OnEnable()
             end
         end
 
-        StoryExtended:RegisterOptionsTable("StoryExtended_options", options)                                        -- Register the main options menu
-        StoryExtended.optionsFrame = AceConfigDialog:AddToBlizOptions("StoryExtended_options", "StoryExtended")
+        StoryExtended:RegisterOptionsTable("StoryExtended", options)                                        -- Register the main options menu
+        StoryExtended.optionsFrame = AceConfigDialog:AddToBlizOptions("StoryExtended", "StoryExtended")
         SLASH_StoryExtended1 = "/storyextended"                                                                     -- Create a slash command 
         SlashCmdList["StoryExtended"] = function() InterfaceOptionsFrame_OpenToCategory("StoryExtended") end        -- to open the options panel
 
@@ -307,7 +307,6 @@ function StoryExtended:OnEnable()
 
         DialogueFrame:ClearAllPoints()
         if HideUIOption == true then
-            DEFAULT_CHAT_FRAME:AddMessage("DB function")
             if SavedDialogueFrames[5] == 100 then
                 DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
             else
@@ -422,8 +421,8 @@ function StoryExtended:OnEnable()
 
 
         -- Register the main options menu
-        LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended_options", options)
-        StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended_options", "StoryExtended")
+        LibStub("AceConfig-3.0"):RegisterOptionsTable("StoryExtended", options)
+        StoryExtended.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("StoryExtended", "StoryExtended")
 
         local profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(StoryExtended.db)           -- Gets optionstable DB
         -- Register the profile tab in the options menu
@@ -452,7 +451,6 @@ function StoryExtended:OnEnable()
 
         DialogueFrame:ClearAllPoints()
         if HideUIOption == true then
-            DEFAULT_CHAT_FRAME:AddMessage("DB function")
             if SavedDialogueFrames[5] == 100 then
                 DialogueFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 50)
             else
@@ -577,7 +575,6 @@ end
 -- Mark the quest as finished in the SavedVariables
 function markQuestFinished(questId)
     if Version.IsAnyLegacy then
-        DEFAULT_CHAT_FRAME:AddMessage("Mark quest finished")
         if not StoryExtendedDB[99999] then                                          -- The table keys are numericals so I chose a high number for the QuestList
             StoryExtendedDB[99999] = {}                                             -- Create the table if it doesn't exist
         end
@@ -607,13 +604,6 @@ function ManualQuestFinish(questID)
         StoryExtendedDB[99999] = {}
     end
     StoryExtendedDB[99999][questID] = true
-    DEFAULT_CHAT_FRAME:AddMessage(tostring(StoryExtendedDB[99999][questID]))
-    for k, v in pairs(StoryExtendedDB) do
-        DEFAULT_CHAT_FRAME:AddMessage(k)
-        for k, v in pairs(v) do
-            DEFAULT_CHAT_FRAME:AddMessage(k)
-        end
-    end
 end
 -- End of storing completed Quests for wow 1.12 workaround
 
@@ -669,10 +659,14 @@ local hiddenUiList = {}
 if Version.IsAnyLegacy then
     hideUiList = {Minimap, ChatFrame1, MainMenuBar, PlayerFrame, TargetFrame, MultiBarBottomLeft, MultiBarBottomRight, MultiBarRight, MultiBarLeft, 
                 PartyMemberFrame1, PartyMemberFrame2, PartyMemberFrame3, PartyMemberFrame4, BuffFrame, QuestWatchFrame, WatchFrame, DurabilityFrame, }
+elseif Version.IsRetailMainline then
+    hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBar, MicroMenuContainer, BagsBar, MultiBarLeft, MultiBarRight,
+                MultiBarBottomLeft, MultiBarBottomRight, StanceBar, StatusTrackingBarManager, BuffFrame, ObjectiveTrackerFrame}
 else
     hideUiList = {MinimapCluster, PlayerFrame, TargetFrame, MainMenuBarArtFrame, MainMenuExpBar, MultiCastActionBarFrame, ChatFrame1, TotemFrame, 
-            VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
+    VerticalMultiBarsContainer, MultiBarLeft, ChatFrameMenuButton, ChatFrameChannelButton, WatchFrame, StanceBarFrame}
 end
+
 function HideUI_Toggle()
 	if (UIParent:IsShown()) then
 		UIParent:Hide()
@@ -705,7 +699,6 @@ local function ShowUI()
                         v:Show()
                     end
                 else
-                    DEFAULT_CHAT_FRAME:AddMessage("hi")
                     v:Show()
                 end
             end
@@ -750,7 +743,6 @@ DialogueFrame:SetScript("OnDragStop", function() DialogueFrame:StopMovingOrSizin
     SavedDialogueFrames[2] = ""
     SavedDialogueFrames[6] = "UIParent"
     StoryExtended.db.profile.SavedDialogueFrames = SavedDialogueFrames
-    DEFAULT_CHAT_FRAME:AddMessage("Saved Position")
 end)
 tinsert(UISpecialFrames, "DialogueFrame")                                   -- Close with ESC key
 DialogueFrame:SetScript("OnHide", function(self)                            -- Show TalkStoryBtn again (only needed when closing with ESC key)
@@ -938,6 +930,7 @@ local modelIdAnimLength = {                 -- If anims other than "talk" are us
     ["character/northrendskeleton/male/northrendskeletonmale"]  = {id = 233367,     animLength = { [60] = 3.600, [1] = 0 },},
     ["character/orc/female/orcfemale"]                          = {id = 121087,     animLength = { [60] = 1.900, [1] = 0 },},
     ["character/orc/female/orcfemale_npc"]                      = {id = 121087,     animLength = { [60] = 1.900, [1] = 0 },},
+    ["character/orc/female/orcfemale_hd"]                       = {id = 949470,     animLength = { [60] = 1.900, [1] = 0 },},
     ["character/orc/male/orcmale"]                              = {id = 121287,     animLength = { [60] = 1.900, [1] = 2.000 },},
     ["character/orc/male/orcmale_hd"]                           = {id = 917116,     animLength = { [60] = 2.000, [1] = 0 },},
     ["character/orc/male/orcmale_npc"]                          = {id = 917116,     animLength = { [60] = 2.000, [1] = 0 },},
@@ -1608,7 +1601,6 @@ local function chooseDatabase(targetName)
             end
         end
         if (foundNpcDialogues ~= nil and count > 0) then                                    -- if a possible dialogue was found
-            DEFAULT_CHAT_FRAME:AddMessage("success?")
             return dialogueData, conditionSuccess, addonName                                -- return its data
         end
     end
@@ -1726,7 +1718,6 @@ end
 function StoryExtendedEventsVanilla_OnEvent(...)
     if(event == "ADDON_LOADED" and arg1 == "StoryExtended") then
         _G["StoryExtendedDB"] = StoryExtendedDB or {}
-        DEFAULT_CHAT_FRAME:AddMessage("Create StoryExtendeDB")
     elseif(event == "PLAYER_LOGOUT" and arg1 == "StoryExtended") then
     end
 end
@@ -1734,7 +1725,6 @@ end
 function StoryExtendedEventsCurrent_OnEvent(self, event, addonName)
     if(event == "ADDON_LOADED" and addonName == "StoryExtended") then
         _G["StoryExtendedDB"] = StoryExtendedDB or {}
-        print("Create StoryExtendeDB")
     elseif(event == "PLAYER_LOGOUT" and addon == "StoryExtended") then
     end
 end
