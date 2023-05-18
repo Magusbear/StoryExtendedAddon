@@ -1352,6 +1352,13 @@ local function StartConditionCheck(targetName, conditionType, conditionValue)   
 
 end
 
+local function stringInterpolation(input_text)
+    local playerName = UnitName("player")
+    local playerClass = UnitClass("player")
+    local playerRace = UnitRace("player")
+    local message = string.format(input_text, playerName, playerClass, playerRace)
+    return message
+end
 
 
 -- Function to update the text and buttons based on the NPC information
@@ -1393,7 +1400,10 @@ local function UpdateFrame(CurrentDialogue, targetName, DatabaseName, NotNPC)
             return
         end
     end
-    DialogueText:SetText(CurrentDialogue.Text)                                              -- Set the dialogue text
+
+    local interpolatedDialogueText = ""
+    interpolatedDialogueText = stringInterpolation(CurrentDialogue.Text)
+    DialogueText:SetText(interpolatedDialogueText)                                              -- Set the dialogue text
     SpeakerName:SetText(CurrentDialogue.Name)
     if string.len(CurrentDialogue.Name) >= 12 then                       -- Resize the text if the player dialogue choice is too long
         local maxLength = 12
