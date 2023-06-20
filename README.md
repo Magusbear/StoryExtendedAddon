@@ -28,6 +28,6 @@ To write your own dialogue either head to https://mnauditt.de/storyextended or h
 ## Contribution and License
 This project is licensed through a GPL-3.0 license.
 
-I welcome everyone to contribute or use the code in this project by following the terms of its GPL-3.0 license.
+I welcome everyone to contribute or use the code in this project by following the terms of its MIT license.
 
 I might clean up the code at some point, hopefully making it easier to contribute, but that might be a ways off.
