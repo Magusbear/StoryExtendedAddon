@@ -18,7 +18,7 @@ This is the core addon which is always needed. It works for WoW 1.12, Classic (+
 ## Installation
 Download the newest release from the releases page and extract the downloaded zip into your World Of Warcraft/AddOns folder
 
-* *Note: You will need a dialogue Addon as well for any dialogue to show up. As the core addon doesn't contain any dialogue by itself* *
+* *Note: You will need a dialogue Addon as well for any dialogue to show up. As the core addon doesn't contain any dialogue by itself* 
 
 ## Writing dialogue
 This project is meant as a community effort. That means that everyone should be able to write their own dialogue and release it for everyone to enjoy.
